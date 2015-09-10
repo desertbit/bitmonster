@@ -1,0 +1,4 @@
+- on logout stop all watchers on the server side!
+- Serve the javascript and stylesheet within the library.
+- Implement protocol version check.
+- text edit plugin: SEO support with word count and keyword count.

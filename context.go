@@ -44,8 +44,6 @@ type Context struct {
 	callbackError   bool   // If true, then the error callback is defined.
 }
 
-/// TODO: also validate with struct tags!!!!!!!!!!
-
 // Decode the context data to a custom value.
 // The value has to be passed as pointer.
 func (c *Context) Decode(v interface{}) error {

@@ -39,7 +39,45 @@ func main() {
 
 	bitmonster.Add("users", bitmonster.Module{
 		"get": getUsers,
+
+		"delete": bitmonster.Hook{
+			Hook: func() bool,
+			// or
+			Hook: func(c* Context), // With c.Abort() ?
+			Func: ...,
+		}
+
+		// Interfae{} to type ModuleItem ?
+
+		"custom": auth.Auth(auth.AuthOpts {
+			Groups: ...,
+			Func: ...,
+			}),
+
+		"add": bitmonster.Auth {
+			Groups: bitmonster.Groups{
+				auth.
+			},
+			Func:
+		},
+
+		"onDelete": bitmonster.Event{},
+		"onNew": bitmonster.Event{
+			Init: func(releaseChan),
+			Release: func(),
+			BindHook: func(instance),
+			TriggerHook: func(),
+		},
 	})
+
+call module.init() after adding and pass module name.
+Context.Header?
+	MethodContext?
+
+// Get the event.
+	module.Event("onNew").Trigger(data)
+	context.Module().Event("onNew").Trigger()
+	context.Event("onNew").Trigger()
 
 	// Start the BitMonster server.
 	bitmonster.Fatal(bitmonster.Run())

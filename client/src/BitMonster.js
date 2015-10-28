@@ -36,6 +36,7 @@ var BitMonster = function(host) {
     @@include('./utils.js')
     @@include('./translate/translate.js')
     @@include('./ui/ConnLostWidget.js')
+    @@include('./scope.js')
     @@include('./socket.js')
     @@include('./module.js')
 

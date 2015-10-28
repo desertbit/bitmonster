@@ -16,21 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Log backend used by the BitMonster library.
-// Use the logrus L value to adapt the log formatting
-// or log levels if required...
-package log
+package bitmonster
 
-import (
-	"github.com/Sirupsen/logrus"
-)
+//#######################//
+//### Hook Interface ####//
+//#######################//
 
-var (
-	L = logrus.New()
-)
-
-func init() {
-	// Set the default log options.
-	L.Formatter = new(logrus.TextFormatter)
-	L.Level = logrus.DebugLevel
+// A Hook is executed before the actual Module Method or Event.
+type Hook interface {
+	Hook(c *Context) error
 }

@@ -20,9 +20,9 @@
 
 package main
 
+/*
 import (
 	"fmt"
-	"time"
 
 	"github.com/desertbit/bitmonster"
 	"github.com/desertbit/bitmonster/settings"
@@ -38,14 +38,6 @@ import (
 // - ? The upper implementation should register and add events to an internal module array.
 // - ? This internal registration of module events should add the possibility to bind events also on the Go side.
 
-type auth struct{}
-
-func (a *auth) Hook(c *bitmonster.Context) error {
-	println("hook")
-	//c.Error("Error Hook")
-	return nil
-}
-
 func main() {
 	// Add the custom fileserver paths.
 	settings.Settings.FileServer = settings.FileServer{
@@ -56,37 +48,35 @@ func main() {
 	// Initialize BitMonster.
 	bitmonster.Fatal(bitmonster.Init())
 
-	// Create a new module.
 	m, err := bitmonster.NewModule("users")
-	bitmonster.Fatal(err)
 
-	// ?
-	// m.addHooks(&auth{})
+	m.AddMethod("get", getUsers)
 
-	// Add module methods.
-	m.AddMethod("get", getUsers, &auth{})
+	m.AddMethod("delete", func() bool { return true }, method)
+	m.AddMethod("delete", hook1, hook2, ... , method)
 
-	// Add events.
-	m.AddEvent("onNew", &auth{})
+	m.AddMethod("custom", auth.Group("admin"), ... , method)
 
-	//######
+	m.AddEvent("onDelete")
+	m.AddEvent("onNew", hook1, hook2, ...)
+	m.AddEvent("onNew", {
+		hook1,
+		hook2,
+		}, ...)
+
+	// ? Trigger hooks for events?
+
+
+
 	// Get the event.
-	e, err := m.Event("onNew")
-	if err != nil {
-		bitmonster.Fatal(err)
-	}
+	module.Event("onNew").Trigger(data)
+	context.Module().Event("onNew").Trigger()
+	context.Event("onNew").Trigger()
 
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			// Trigger the event.
-			err = e.Trigger()
-			if err != nil {
-				bitmonster.Fatal(err)
-			}
-		}
-	}()
-	//#####
+	context.Event("onNew").Listen(func(c *Context, u *auth.User) {
+
+	})
+
 
 	// Start the BitMonster server.
 	bitmonster.Fatal(bitmonster.Run())
@@ -107,26 +97,9 @@ func getUsers(c *bitmonster.Context) error {
 
 	fmt.Printf("%+v\n", v)
 
-	// Get the event.
-	e, err := c.Module().Event("onNew")
-	if err != nil {
-		return err
-	}
-
-	// Trigger the event.
-	err = e.Trigger(v)
-	if err != nil {
-		return err
-	}
-
-	// Shortcut:
-	err = c.TriggerEvent("onNew", v)
-	if err != nil {
-		return err
-	}
-
-	c.Data(&v)
+	c.Success(&v)
 	c.Error("error message")
 
 	return nil
 }
+*/

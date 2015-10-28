@@ -32,38 +32,32 @@ import (
 // A Context contains the function call context with the passed parameters
 // and the registered callbacks.
 type Context struct {
-	c        *glue.Channel
-	dataJSON string
+	// A map to hold custom data values.
+	// Commonly used by hooks.
+	Values map[interface{}]interface{}
 
-	successData interface{} // Set if the Success method is called.
-	err         error       // Set if the Error method is called.
+	// Private:
+	// ########
 
-	// Optional:
-	callbackID      string // If not set, then no callbacks are defined.
-	callbackSuccess bool   // If true, then the success callback is defined.
-	callbackError   bool   // If true, then the error callback is defined.
+	socket        *glue.Socket
+	module        *Module
+	paramDataJSON string
+
+	data interface{} // Set if the Success method is called.
+	err  error       // Set if the Error method is called.
 }
 
-// Decode the context data to a custom value.
-// The value has to be passed as pointer.
-func (c *Context) Decode(v interface{}) error {
-	// Check if the data JSON string is empty.
-	if len(c.dataJSON) == 0 {
-		return fmt.Errorf("no context data available to decode")
+func newContext(s *glue.Socket, m *Module, paramDataJSON string) *Context {
+	return &Context{
+		socket:        s,
+		module:        m,
+		paramDataJSON: paramDataJSON,
 	}
-
-	// Unmarshal the data JSON.
-	err := json.Unmarshal([]byte(c.dataJSON), v)
-	if err != nil {
-		return fmt.Errorf("json unmarshal: %v", err)
-	}
-
-	return nil
 }
 
-// Success sets the success data which is passed to the client.
-func (c *Context) Success(d interface{}) {
-	c.successData = d
+// Data sets the data value which is passed finally to the client.
+func (c *Context) Data(d interface{}) {
+	c.data = d
 }
 
 // Error sets the error message which is passed to the error callback.
@@ -72,111 +66,47 @@ func (c *Context) Error(msg string) {
 	c.err = fmt.Errorf(msg)
 }
 
-//###############################//
-//### Private Conext Methods ####//
-//###############################//
-
-func (c *Context) hasError() bool {
+// HasError returns a boolean whenever the context error was set.
+func (c *Context) HasError() bool {
 	return c.err != nil
 }
 
-func (c *Context) triggerSuccessCallback() error {
-	// Skip if no callback ID is set.
-	if len(c.callbackID) == 0 {
-		return nil
+// Decode the context data to a custom value.
+// The value has to be passed as pointer.
+func (c *Context) Decode(v interface{}) error {
+	// Check if the data JSON string is empty.
+	if len(c.paramDataJSON) == 0 {
+		return fmt.Errorf("no context data available to decode")
 	}
 
-	// Just cleanup the callback hooks on the client-side if no
-	// success callback is defined on the client-side.
-	if !c.callbackSuccess {
-		return c.triggerCleanupCallback()
-	}
-
-	// Create the JSON object.
-	data := struct {
-		CallbackID string      `json:"callbackID"`
-		Type       string      `json:"type"`
-		Data       interface{} `json:"data"`
-	}{
-		CallbackID: c.callbackID,
-		Type:       "success",
-		Data:       c.successData,
-	}
-
-	// Marshal to JSON.
-	dataJSON, err := json.Marshal(&data)
+	// Unmarshal the data JSON.
+	err := json.Unmarshal([]byte(c.paramDataJSON), v)
 	if err != nil {
-		return err
+		return fmt.Errorf("json unmarshal: %v", err)
 	}
-
-	// Send the trigger request to the client.
-	c.c.Write(string(dataJSON))
 
 	return nil
 }
 
-func (c *Context) triggerErrorCallback() error {
-	// Skip if no callback ID is set.
-	if len(c.callbackID) == 0 {
-		return nil
-	}
-
-	// Just cleanup the callback hooks on the client-side if no
-	// error callback is defined on the client-side.
-	if !c.callbackError {
-		return c.triggerCleanupCallback()
-	}
-
-	// Create the JSON object.
-	data := struct {
-		CallbackID string `json:"callbackID"`
-		Type       string `json:"type"`
-		Message    string `json:"message"`
-	}{
-		CallbackID: c.callbackID,
-		Type:       "error",
-	}
-
-	// Set the error message if present.
-	if c.err != nil {
-		data.Message = c.err.Error()
-	}
-
-	// Marshal to JSON.
-	dataJSON, err := json.Marshal(&data)
-	if err != nil {
-		return err
-	}
-
-	// Send the trigger request to the client.
-	c.c.Write(string(dataJSON))
-
-	return nil
+// Module returns the module of the context.
+func (c *Context) Module() *Module {
+	return c.module
 }
 
-func (c *Context) triggerCleanupCallback() error {
-	// Skip if no callback ID is set.
-	if len(c.callbackID) == 0 {
-		return nil
-	}
-
-	// Create the JSON object.
-	data := struct {
-		CallbackID string `json:"callbackID"`
-		Type       string `json:"type"`
-	}{
-		CallbackID: c.callbackID,
-		Type:       "cleanup",
-	}
-
-	// Marshal to JSON.
-	dataJSON, err := json.Marshal(&data)
+// TriggerEvent triggers an event of the module.
+// Pass optional one variadic parameter value.
+func (c *Context) TriggerEvent(name string, data ...interface{}) error {
+	// Get the event.
+	e, err := c.module.Event(name)
 	if err != nil {
 		return err
 	}
 
-	// Send the trigger request to the client.
-	c.c.Write(string(dataJSON))
+	// Trigger the event.
+	err = e.Trigger(data...)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

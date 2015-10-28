@@ -16,8 +16,39 @@
 		// Get the users module.
 		var users = bm.module("users");
 
+		// users.call("get");
+
+		var e = users.on("onNew", function(data) {
+			console.log("onNew triggered");
+			console.log(data);
+		});
+
+/*
+		bm.scope("usersPage", e);
+
 		// Call the method get of the module users.
-		users.call("get");
+		setTimeout(function() {
+			bm.scope("usersPage").off();
+		}, 1500);
+
+		// Call the method get of the module users.
+		setTimeout(function() {
+			users.call("get", {
+				name:   "Sample",
+				foo:    "bar"
+			});
+		}, 1000);
+
+		setTimeout(function() {
+			users.call("get", {
+				name:   "Sample",
+				foo:    "bar"
+			});
+		}, 2000);
+
+*/
+
+		/*
 
 		// Call with a parameter object.
 		users.call("get", {
@@ -46,7 +77,7 @@
 			console.log(data);
 		}, function(err) {
 			console.log("error: " + err);
-		});
+		});*/
 	</script>
 </body>
 </html>

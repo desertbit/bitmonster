@@ -63,23 +63,21 @@ users.on("new", function(data) {
 });
 
 // Bind an event function and pass a parameter object.
+/*
 users.on("new", {
     name:   "Sample",
     foo:    bar
 }, function(data) {
 
 });
+*/
 
 // Control the event.
-var scope = users.on("new", function(data) {});
-scope.sleep();
-scope.wake();
-scope.off();
+var e = users.on("new", function(data) {});
+e.off();
 
 // Add events to global scope group.
-users.on("new", ... ).scope("usersPage");
-users.on("delete", ... ).scope("usersPage");
-users.on("edit", ... ).scope("usersPage");
-bm.scope("usersPage").sleep();
-bm.scope("usersPage").wake();
+bm.scope("usersPage", users.on("new", function() {} ));
+bm.scope("usersPage", users.on("delete", function() {} ));
+bm.scope("usersPage", users.on("edit", function() {} ));
 bm.scope("usersPage").off();

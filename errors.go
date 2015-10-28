@@ -16,21 +16,32 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Log backend used by the BitMonster library.
-// Use the logrus L value to adapt the log formatting
-// or log levels if required...
-package log
+package bitmonster
 
 import (
-	"github.com/Sirupsen/logrus"
+	"github.com/desertbit/bitmonster/log"
 )
 
 var (
-	L = logrus.New()
+	initErrors []error
 )
 
-func init() {
-	// Set the default log options.
-	L.Formatter = new(logrus.TextFormatter)
-	L.Level = logrus.DebugLevel
+// initError tells BitMonster that an initialization error occurred.
+// The initialization process is done after BitMonster.Run is called.
+// If any initError occurred, then the application aborts and logs the error.
+// This method is not thread-safe!
+func initError(err error) {
+	initErrors = append(initErrors, err)
+}
+
+// hasInitErrors returns a boolean whenever there are initialization errors.
+func hasInitErrors() bool {
+	return len(initErrors) != 0
+}
+
+// Log the initialization errors.
+func logInitErrors() {
+	for _, err := range initErrors {
+		log.L.Errorf("initialization error: %v", err)
+	}
 }

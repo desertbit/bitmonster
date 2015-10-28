@@ -18,195 +18,115 @@
 
 package bitmonster
 
-import (
-	"encoding/json"
-
-	"github.com/Sirupsen/logrus"
-	"github.com/desertbit/bitmonster/log"
-	"github.com/desertbit/glue"
-	"github.com/desertbit/glue/utils"
-)
+import "fmt"
 
 var (
-	modules = make(map[string]Module)
+	modules = make(map[string]*Module)
 )
 
-//#####################//
-//### Public Types ####//
-//#####################//
+//####################//
+//### Module Type ####//
+//####################//
 
-// A ModuleFunc is a module function.
-// If an error is returned, the error callback on the client side is triggered.
-type ModuleFunc func(*Context) error
-
-// A Module is composed of functions.
-type Module map[string]ModuleFunc
-
-//######################//
-//### Private Types ####//
-//######################//
-
-type callOpts struct {
-	Module string `json:"module"`
-	Method string `json:"method"`
-
-	// Optional:
-	CallbackID      string `json:"callbackID"`      // If not set, then no callbacks are defined.
-	CallbackSuccess bool   `json:"callbackSuccess"` // If true, then the success callback is defined.
-	CallbackError   bool   `json:"callbackError"`   // If true, then the error callback is defined.
+// A Module contains and handles methods and events.
+type Module struct {
+	name    string
+	methods map[string]*methodContext
+	events  map[string]*Event
 }
 
-//##############//
-//### Public ###//
-//##############//
-
-// Add a new BitMonster module.
+// NewModule creates and register a new BitMonster Module.
 // This method is not thread-safe and should be called only
 // during application initialization.
-func Add(name string, module Module) {
+func NewModule(name string) (*Module, error) {
 	// Validate the name.
 	if len(name) == 0 {
-		log.L.Errorf("add module: empty module name!")
-		return
+		return nil, fmt.Errorf("empty module name")
 	}
 
 	// Check if a module with the same name exists already.
 	if _, ok := modules[name]; ok {
-		log.L.Errorf("add module: a module with the name '%s' exists already!", name)
-		return
+		return nil, fmt.Errorf("a module with the name '%s' exists already", name)
+	}
+
+	// Create a new module value.
+	m := &Module{
+		name:    name,
+		methods: make(map[string]*methodContext),
+		events:  make(map[string]*Event),
 	}
 
 	// Add the module to the modules map.
-	modules[name] = module
+	modules[name] = m
+
+	return m, nil
 }
 
-//###############//
-//### Private ###//
-//###############//
+// Name returns the module's name.
+func (m *Module) Name() string {
+	return m.name
+}
 
-func callRequest(s *glue.Socket, c *glue.Channel, data string) {
-	// Predefine the context to trigger the error callback on panics.
-	var context *Context
-
-	// Catch all panics and log the error.
-	defer func() {
-		if e := recover(); e != nil {
-			log.L.WithFields(logrus.Fields{
-				"remoteAddress": s.RemoteAddr(),
-				"data":          data,
-			}).Errorf("panic: request: module method call: %v", e)
-
-			// Trigger the error callback on the client-side if possible.
-			if context != nil {
-				context.Error("")              // Empty the error message first.
-				context.triggerErrorCallback() // Ingore the returned error...
-			}
+// AddMethod adds a method which is callable from the client-side.
+// Optionally pass hooks which are processed before.
+// This method is not thread-safe and should be only called during
+// module initialization.
+func (m *Module) AddMethod(name string, method Method, hooks ...Hook) {
+	// Handle errors simple.
+	err := func() error {
+		// Check if the method name already exists.
+		if _, ok := m.methods[name]; ok {
+			return fmt.Errorf("a method with the name is already registered")
 		}
+
+		// Create the method context and set the method and its hooks.
+		mc := newMethodContext(method, hooks)
+
+		// Add it to the methods map.
+		m.methods[name] = mc
+
+		return nil
 	}()
 
-	// Split the options JSON from the data JSON.
-	optsJSON, dataJSON, err := utils.UnmarshalValues(data)
+	// Handle the error if present.
 	if err != nil {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"data":          data,
-		}).Warningf("client request: invalid module method call: %v", err)
+		initError(fmt.Errorf("module '%s': method '%s': %v", m.name, name, err))
 		return
 	}
+}
 
-	// Check if empty.
-	if len(optsJSON) == 0 {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-		}).Warningf("client request: invalid module method call: empty module options.")
-		return
-	}
-
-	// Unmarshal the options JSON.
-	var opts callOpts
-	err = json.Unmarshal([]byte(optsJSON), &opts)
-	if err != nil {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"json":          optsJSON,
-		}).Warningf("client request: invalid module method call: json unmarshal: %v", err)
-		return
-	}
-
-	// Validate for required option fields.
-	if len(opts.Module) == 0 || len(opts.Method) == 0 {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"options":       opts,
-		}).Warningf("client request: invalid module method call: missing option fields.")
-		return
-	}
-
-	// Get the module by the name.
-	m, ok := modules[opts.Module]
-	if !ok {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"options":       opts,
-		}).Warningf("client request: invalid module method call: module does not exists.")
-		return
-	}
-
-	// Get the module method by the function name.
-	f, ok := m[opts.Method]
-	if !ok {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"options":       opts,
-		}).Warningf("client request: invalid module method call: module method does not exists.")
-		return
-	}
-
-	// Create a new context value.
-	context = &Context{
-		c:               c,
-		dataJSON:        dataJSON,
-		callbackID:      opts.CallbackID,
-		callbackSuccess: opts.CallbackSuccess,
-		callbackError:   opts.CallbackError,
-	}
-
-	// Call the module function with the context.
-	err = f(context)
-	if err != nil {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"module":        opts.Module,
-			"method":        opts.Method,
-		}).Warningf("client request: module method call: error: %v", err)
-
-		// Trigger the error callback on the client-side.
-		err = context.triggerErrorCallback()
-		if err != nil {
-			log.L.Warningf("client request: module method call: failed to trigger error callback: %v", err)
+// AddEvent adds and registers a new event.
+func (m *Module) AddEvent(name string, hooks ...Hook) {
+	// Handle errors simple.
+	err := func() error {
+		// Check if the event name already exists.
+		if _, ok := m.events[name]; ok {
+			return fmt.Errorf("an event with the name is already registered")
 		}
 
-		return
-	}
+		// Create a new event.
+		event := newEvent(name, hooks)
 
-	// Trigger the error callback on the client-side if an error was set by the module function.
-	if context.hasError() {
-		err = context.triggerErrorCallback()
-		if err != nil {
-			log.L.WithFields(logrus.Fields{
-				"remoteAddress": s.RemoteAddr(),
-				"options":       opts,
-			}).Warningf("client request: module method call: failed to trigger error callback: %v", err)
-		}
-		return
-	}
+		// Add it to the events map.
+		m.events[name] = event
 
-	// Finally trigger the success callback on the client-side.
-	err = context.triggerSuccessCallback()
+		return nil
+	}()
+
+	// Handle the error if present.
 	if err != nil {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"options":       opts,
-		}).Warningf("client request: module method call: failed to trigger success callback: %v", err)
+		initError(fmt.Errorf("module '%s': event '%s': %v", m.name, name, err))
+		return
 	}
+}
+
+// Event returns the event specified by the name.
+func (m *Module) Event(name string) (*Event, error) {
+	// Try to obtain the event.
+	e, ok := m.events[name]
+	if !ok {
+		return nil, fmt.Errorf("the event with the name '%s' does not exists", name)
+	}
+
+	return e, nil
 }

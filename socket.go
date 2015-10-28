@@ -27,7 +27,8 @@ import (
 //#################//
 
 const (
-	channelCall = "call"
+	channelCall  = "call"
+	channelEvent = "event"
 )
 
 //###############//
@@ -46,10 +47,17 @@ func onNewSocket(s *glue.Socket) {
 	s.DiscardRead()
 
 	// Create and prepare the call channel.
-	c := s.Channel(channelCall)
-	c.OnRead(func(data string) {
+	callChan := s.Channel(channelCall)
+	callChan.OnRead(func(data string) {
 		// Trigger the call request.
-		callRequest(s, c, data)
+		handleCallRequest(s, callChan, data)
+	})
+
+	// Create and prepare the event channel.
+	eventChan := s.Channel(channelEvent)
+	eventChan.OnRead(func(data string) {
+		// Trigger the event request.
+		handleEventRequest(s, eventChan, data)
 	})
 }
 

@@ -55,6 +55,7 @@ var (
 	isShuttdingDown bool
 	releaseMutex    sync.Mutex
 
+	// The glue socket server instance.
 	server *glue.Server
 )
 
@@ -143,6 +144,13 @@ func Run() error {
 	// Just check if the init method was skipped.
 	if server == nil {
 		log.L.Fatalln("BitMonster is not initialized!")
+	}
+
+	// Check if initialization errors occurred.
+	if hasInitErrors() {
+		// Log the errors and abort.
+		logInitErrors()
+		return fmt.Errorf("initialization errors occurred")
 	}
 
 	log.L.Infoln("BitMonster Server running.")

@@ -27,7 +27,8 @@ bm.module = (function() {
      */
 
     var callbackIDLength    = 14,
-        eventIDLength       = 14;
+        eventIDLength       = 14,
+        methodCallTimeout   = 7000; // 7 seconds
 
 
 
@@ -72,8 +73,14 @@ bm.module = (function() {
              return;
          }
 
-         // Remove the callback object again from the map.
+         // Remove the callback object from the map.
          delete callbacksMap[data.callbackID];
+
+         // Stop the timeout.
+         if (cb.timeout) {
+             clearTimeout(cb.timeout);
+             cb.timeout = false;
+         }
 
          try {
              // Determind the request type and call the callback.
@@ -236,11 +243,27 @@ bm.module = (function() {
                 }
             }
 
-            // Add the callbacks with the ID to the callbacks map.
-            callbacksMap[callbackID] = {
+            // Create a new callbacks map item.
+            var cb = {
                 success:    successCallback,
                 error:      errorCallback
             };
+
+            // Create a timeout.
+            cb.timeout = setTimeout(function() {
+                cb.timeout = false;
+
+                // Remove the callback object again from the map.
+                delete callbacksMap[callbackID];
+
+                // Trigger the error callback if defined.
+                if (cb.error) {
+                    cb.error("method call timeout: no server response received within the timeout");
+                }
+            }, methodCallTimeout);
+
+            // Add the callbacks with the ID to the callbacks map.
+            callbacksMap[callbackID] = cb;
 
             // Add the callbacks ID to the options.
             opts.callbackID = callbackID;
@@ -279,23 +302,7 @@ bm.module = (function() {
         eventChannel.send(opts);
     };
 
-    // Listens on the specific server-side event and triggers the callback.
-    var onEvent = function(module, event, callback) {
-        // Create a random event ID and check if it does not exist already.
-        var eventID;
-        while(true) {
-            eventID = utils.randomString(eventIDLength);
-            if (!eventsMap[eventID]) {
-                break;
-            }
-        }
-
-        // Add the event object with the ID to the events map.
-        eventsMap[eventID] = {
-            event   : event,
-            callback: callback
-        };
-
+    var sendBindEventRequest = function(module, event, eventID) {
         // Create the event options.
         var opts = {
             type   : "on",
@@ -309,6 +316,28 @@ bm.module = (function() {
 
         // Call the server function to bind the event.
         eventChannel.send(opts);
+    };
+
+    // Listens on the specific server-side event and triggers the callback.
+    var onEvent = function(module, event, callback) {
+        // Create a random event ID and check if it does not exist already.
+        var eventID;
+        while(true) {
+            eventID = utils.randomString(eventIDLength);
+            if (!eventsMap[eventID]) {
+                break;
+            }
+        }
+
+        // Add the event object with the ID to the events map.
+        eventsMap[eventID] = {
+            module  : module,
+            event   : event,
+            callback: callback
+        };
+
+        // Bind the event.
+        sendBindEventRequest(module, event, eventID);
 
         // Return the scope
         return {
@@ -318,6 +347,14 @@ bm.module = (function() {
             }
         };
     };
+
+    // Rebind the events on reconnections.
+    socket.on("connected", function() {
+        $.each(eventsMap, function(eventID, e) {
+            // Rebind the event.
+            sendBindEventRequest(e.module, e.event, eventID);
+        });
+    });
 
 
 

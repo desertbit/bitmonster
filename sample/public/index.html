@@ -16,6 +16,17 @@
 		// Get the users module.
 		var users = bm.module("users");
 
+
+		users.call("get", {
+			name:   "Sample",
+			foo:    "bar"
+		}, function(data) {
+			console.log("success:");
+			console.log(data);
+		}, function(err) {
+			console.log("error: " + err);
+		});
+
 		// users.call("get");
 
 		var e = users.on("onNew", function(data) {

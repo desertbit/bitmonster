@@ -25,12 +25,10 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/desertbit/glue"
 	"github.com/desertbit/glue/log"
 )
 
 const (
-	eventListenerKeyLength       = 14
 	eventListenerTriggerChanSize = 5
 	eventListenerTriggerTimeout  = 3 * time.Second
 )
@@ -88,6 +86,10 @@ func (e *Event) Trigger(data ...interface{}) error {
 	return nil
 }
 
+func (e *Event) TriggerFor(data ...interface{}) error {
+	return nil
+}
+
 // addListener adds an event listeners to the event's listener map.
 func (e *Event) addListener(l *eventListener, key string) {
 	// Lock the mutex.
@@ -137,10 +139,9 @@ const (
 )
 
 type eventOpts struct {
-	Type    string `json:"type"`
-	Module  string `json:"module"`
-	Event   string `json:"event"`
-	EventID string `json:"eventID"`
+	Type   string `json:"type"`
+	Module string `json:"module"`
+	Event  string `json:"event"`
 }
 
 //#####################################//
@@ -208,7 +209,7 @@ func (l *eventListener) Close() {
 //### Private ###//
 //###############//
 
-func handleEventRequest(s *glue.Socket, c *glue.Channel, data string) {
+func handleEventRequest(s *Socket, data string) {
 	// Catch all panics and log the error.
 	defer func() {
 		if e := recover(); e != nil {
@@ -239,7 +240,7 @@ func handleEventRequest(s *glue.Socket, c *glue.Channel, data string) {
 	}
 
 	// Validate for required option fields.
-	if len(opts.Module) == 0 || len(opts.Event) == 0 || len(opts.EventID) == 0 {
+	if len(opts.Module) == 0 || len(opts.Event) == 0 {
 		log.L.WithFields(logrus.Fields{
 			"remoteAddress": s.RemoteAddr(),
 			"options":       opts,
@@ -267,10 +268,10 @@ func handleEventRequest(s *glue.Socket, c *glue.Channel, data string) {
 		return
 	}
 
-	// Create the event listener unique key.
-	// Prepend the socket ID to not interfere with other sockets.
-	// We cannot trust the generated EventID from the client.
-	key := s.ID() + "_" + opts.EventID
+	// Create the event listener's key.
+	// This is just the socket ID.
+	// A socket should only bind one listener for one event.
+	key := s.ID()
 
 	// Check if an event unbind is requested.
 	if opts.Type == eventOptsTypeOff {
@@ -334,7 +335,7 @@ func handleEventRequest(s *glue.Socket, c *glue.Channel, data string) {
 				return
 
 			case eventData := <-l.triggerChan:
-				triggerEventCallback(c, &opts, eventData)
+				triggerEventCallback(s, &opts, eventData)
 			}
 		}
 	}()
@@ -342,16 +343,18 @@ func handleEventRequest(s *glue.Socket, c *glue.Channel, data string) {
 
 // This method does not return an error.
 // Instead errors are logged.
-func triggerEventCallback(c *glue.Channel, opts *eventOpts, eventDataJSON string) {
+func triggerEventCallback(s *Socket, opts *eventOpts, eventDataJSON string) {
 	// Create the JSON object.
 	data := struct {
-		EventID string `json:"eventID"`
-		Type    string `json:"type"`
-		Data    string `json:"data"`
+		Type   string `json:"type"`
+		Module string `json:"module"`
+		Event  string `json:"event"`
+		Data   string `json:"data"`
 	}{
-		EventID: opts.EventID,
-		Type:    "trigger",
-		Data:    eventDataJSON,
+		Type:   "trigger",
+		Module: opts.Module,
+		Event:  opts.Event,
+		Data:   eventDataJSON,
 	}
 
 	// Marshal to JSON.
@@ -367,5 +370,5 @@ func triggerEventCallback(c *glue.Channel, opts *eventOpts, eventDataJSON string
 	}
 
 	// Send the trigger request to the client.
-	c.Write(string(dataJSON))
+	s.chanEvent.Write(string(dataJSON))
 }

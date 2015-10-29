@@ -26,9 +26,9 @@ bm.module = (function() {
      * Constants
      */
 
-    var callbackIDLength    = 14,
-        eventIDLength       = 14,
-        methodCallTimeout   = 7000; // 7 seconds
+    var callbackIDLength      = 14,
+        eventListenerIDLength = 10,
+        methodCallTimeout     = 7000; // 7 seconds
 
 
 
@@ -122,38 +122,50 @@ bm.module = (function() {
          // Parse the JSON to an object.
          data = JSON.parse(data);
 
-         // The event ID has to be always defined.
-         if (!data.eventID || String(data.eventID).length === 0) {
+         // Check for the required values.
+         if (!data.module || !data.event) {
              logError();
              return;
          }
 
-         // Obtain the event object.
-         var event = eventsMap[data.eventID];
-         if (!event) {
-             logError();
+         // Obtain the module events.
+         var moduleEvents = eventsMap[data.module];
+         if (!moduleEvents) {
+             // Don't log the error. The event was unbound.
              return;
          }
 
-         try {
-             // Determind the event type.
-             if (data.type === "trigger") {
-                 // Parse the JSON data value if present.
-                 var eventData;
-                 if (data.data) {
-                     eventData = JSON.parse(data.data);
+         // Get the event object.
+         var eventObj = moduleEvents.events[data.event];
+         if (!eventObj) {
+             // Don't log the error. The event was unbound.
+             return;
+         }
+
+         // Determind the event type.
+         if (data.type === "trigger") {
+             // Parse the JSON data value if present.
+             var eventData;
+             if (data.data) {
+                 eventData = JSON.parse(data.data);
+             }
+
+             // Create a shallow copy to allow mutations inside the iteration.
+             var listeners = jQuery.extend({}, eventObj.listeners);
+
+             // Trigger the listeners bound to this event.
+             $.each(listeners, function(id, l) {
+                 try {
+                     l.callback(eventData);
                  }
-
-                 // Trigger the event.
-                 event.callback(eventData);
-             }
-             else {
-                 logError();
-             }
+                 catch (e) {
+                     console.log("BitMonster: catched exception while triggering event:");
+                     console.log(e);
+                 }
+             });
          }
-         catch (e) {
-             console.log("BitMonster: catched exception while triggering event:");
-             console.log(e);
+         else {
+             logError();
          }
      });
 
@@ -283,16 +295,35 @@ bm.module = (function() {
     };
 
     // Unbind an event.
-    var offEvent = function(module, event, eventID) {
-        // Remove the callback object again from the map.
-        delete eventsMap[eventID];
+    var offEvent = function(module, event, id) {
+        // Obtain the module events.
+        var moduleEvents = eventsMap[module];
+        if (!moduleEvents) {
+            return;
+        }
+
+        // Get the event object.
+        var eventObj = moduleEvents.events[event];
+        if (!eventObj) {
+            return;
+        }
+
+        // Remove the event listener again from the map.
+        delete eventObj.listeners[id];
+
+        // Unbind the server event if there are no more listeners.
+        if (Object.keys(eventObj.listeners).length > 0) {
+            return;
+        }
+
+        // Remove the event object from the module events.
+        delete moduleEvents.events[event];
 
         // Create the event options.
         var opts = {
             type   : "off",
             module : module,
-            event  : event,
-            eventID: eventID
+            event  : event
         };
 
         // Marshal the options to JSON.
@@ -302,13 +333,12 @@ bm.module = (function() {
         eventChannel.send(opts);
     };
 
-    var sendBindEventRequest = function(module, event, eventID) {
+    var sendBindEventRequest = function(module, event) {
         // Create the event options.
         var opts = {
             type   : "on",
             module : module,
-            event  : event,
-            eventID: eventID
+            event  : event
         };
 
         // Marshal the options to JSON.
@@ -320,39 +350,60 @@ bm.module = (function() {
 
     // Listens on the specific server-side event and triggers the callback.
     var onEvent = function(module, event, callback) {
-        // Create a random event ID and check if it does not exist already.
-        var eventID;
+        // Obtain the module events or create them if they don't exist.
+        var moduleEvents = eventsMap[module];
+        if (!moduleEvents) {
+            moduleEvents = {
+                events: {}
+            };
+            eventsMap[module] = moduleEvents;
+        }
+
+        // Get the event object or create it if it does not exists.
+        var eventObj = moduleEvents.events[event];
+        if (!eventObj) {
+            eventObj = {
+                listeners: {}
+            };
+            moduleEvents.events[event] = eventObj;
+        }
+
+
+        // Create a random event listener ID and check if it does not exist already.
+        var id;
         while(true) {
-            eventID = utils.randomString(eventIDLength);
-            if (!eventsMap[eventID]) {
+            id = utils.randomString(eventListenerIDLength);
+            if (!eventObj.listeners[id]) {
                 break;
             }
         }
 
-        // Add the event object with the ID to the events map.
-        eventsMap[eventID] = {
-            module  : module,
-            event   : event,
+        // Add the event listener with the ID to the map.
+        eventObj.listeners[id] = {
             callback: callback
         };
 
-        // Bind the event.
-        sendBindEventRequest(module, event, eventID);
+        // Bind the event if not bound before.
+        if (Object.keys(eventObj.listeners).length == 1) {
+            sendBindEventRequest(module, event, id);
+        }
 
         // Return the scope
         return {
             // Unbind the event again.
             off: function() {
-                offEvent(module, event, eventID);
+                offEvent(module, event, id);
             }
         };
     };
 
     // Rebind the events on reconnections.
     socket.on("connected", function() {
-        $.each(eventsMap, function(eventID, e) {
-            // Rebind the event.
-            sendBindEventRequest(e.module, e.event, eventID);
+        $.each(eventsMap, function(module, moduleEvents) {
+            $.each(moduleEvents.events, function(event, eventObj) {
+                // Rebind the event.
+                sendBindEventRequest(module, event);
+            });
         });
     });
 

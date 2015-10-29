@@ -25,6 +25,9 @@
 // Include the glue client library directly.
 @@include('../bower_components/glue-socket/client/dist/glue.js')
 
+// Include the polyfills.
+@@include('./polyfills.js')
+
 var BitMonster = function(host) {
     // Turn on strict mode.
     'use strict';

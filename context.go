@@ -21,8 +21,6 @@ package bitmonster
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/desertbit/glue"
 )
 
 //####################//
@@ -39,7 +37,7 @@ type Context struct {
 	// Private:
 	// ########
 
-	socket        *glue.Socket
+	socket        *Socket
 	module        *Module
 	paramDataJSON string
 
@@ -47,7 +45,7 @@ type Context struct {
 	err  error       // Set if the Error method is called.
 }
 
-func newContext(s *glue.Socket, m *Module, paramDataJSON string) *Context {
+func newContext(s *Socket, m *Module, paramDataJSON string) *Context {
 	return &Context{
 		socket:        s,
 		module:        m,

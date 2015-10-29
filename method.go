@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/desertbit/glue"
 	"github.com/desertbit/glue/log"
 	"github.com/desertbit/glue/utils"
 )
@@ -65,7 +64,7 @@ type callOpts struct {
 //### Private ###//
 //###############//
 
-func handleCallRequest(s *glue.Socket, c *glue.Channel, data string) {
+func handleCallRequest(s *Socket, data string) {
 	// Predefine the options to trigger the error callback on panics.
 	var opts *callOpts
 
@@ -80,7 +79,7 @@ func handleCallRequest(s *glue.Socket, c *glue.Channel, data string) {
 			// Trigger the error callback on the client-side if possible.
 			if opts != nil {
 				// Call the error callback with a nil error (unknown).
-				triggerErrorCallback(c, opts, nil)
+				triggerErrorCallback(s, opts, nil)
 			}
 		}
 	}()
@@ -158,13 +157,13 @@ func handleCallRequest(s *glue.Socket, c *glue.Channel, data string) {
 			}).Warningf("client request: module method call: hook error: %v", err)
 
 			// Trigger the error callback on the client-side.
-			triggerErrorCallback(c, opts, context.err)
+			triggerErrorCallback(s, opts, context.err)
 			return
 		}
 
 		// Trigger the error callback on the client-side if an error was set by the hook function.
 		if context.HasError() {
-			triggerErrorCallback(c, opts, context.err)
+			triggerErrorCallback(s, opts, context.err)
 			return
 		}
 	}
@@ -179,23 +178,23 @@ func handleCallRequest(s *glue.Socket, c *glue.Channel, data string) {
 		}).Warningf("client request: module method call: error: %v", err)
 
 		// Trigger the error callback on the client-side.
-		triggerErrorCallback(c, opts, context.err)
+		triggerErrorCallback(s, opts, context.err)
 		return
 	}
 
 	// Trigger the error callback on the client-side if an error was set by the module function.
 	if context.HasError() {
-		triggerErrorCallback(c, opts, context.err)
+		triggerErrorCallback(s, opts, context.err)
 		return
 	}
 
 	// Finally trigger the success callback on the client-side.
-	triggerSuccessCallback(c, opts, context.data)
+	triggerSuccessCallback(s, opts, context.data)
 }
 
 // This method does not return an error.
 // Instead errors are logged.
-func triggerSuccessCallback(c *glue.Channel, opts *callOpts, methodData interface{}) {
+func triggerSuccessCallback(s *Socket, opts *callOpts, methodData interface{}) {
 	// Skip if no callback ID is set.
 	if len(opts.CallbackID) == 0 {
 		return
@@ -204,7 +203,7 @@ func triggerSuccessCallback(c *glue.Channel, opts *callOpts, methodData interfac
 	// Just cleanup the callback hooks on the client-side if no
 	// success callback is defined on the client-side.
 	if !opts.CallbackSuccess {
-		triggerCleanupCallback(c, opts)
+		triggerCleanupCallback(s, opts)
 		return
 	}
 
@@ -223,7 +222,7 @@ func triggerSuccessCallback(c *glue.Channel, opts *callOpts, methodData interfac
 	dataJSON, err := json.Marshal(&data)
 	if err != nil {
 		log.L.WithFields(logrus.Fields{
-			"remoteAddress": c.Socket().RemoteAddr(),
+			"remoteAddress": s.RemoteAddr(),
 			"options":       opts,
 		}).Warningf("client request: module method call: failed to trigger success callback: %v", err)
 
@@ -231,12 +230,12 @@ func triggerSuccessCallback(c *glue.Channel, opts *callOpts, methodData interfac
 	}
 
 	// Send the trigger request to the client.
-	c.Write(string(dataJSON))
+	s.chanCall.Write(string(dataJSON))
 }
 
 // This method does not return an error.
 // Instead errors are logged.
-func triggerErrorCallback(c *glue.Channel, opts *callOpts, cbErr error) {
+func triggerErrorCallback(s *Socket, opts *callOpts, cbErr error) {
 	// Skip if no callback ID is set.
 	if len(opts.CallbackID) == 0 {
 		return
@@ -245,7 +244,7 @@ func triggerErrorCallback(c *glue.Channel, opts *callOpts, cbErr error) {
 	// Just cleanup the callback hooks on the client-side if no
 	// error callback is defined on the client-side.
 	if !opts.CallbackError {
-		triggerCleanupCallback(c, opts)
+		triggerCleanupCallback(s, opts)
 		return
 	}
 
@@ -268,7 +267,7 @@ func triggerErrorCallback(c *glue.Channel, opts *callOpts, cbErr error) {
 	dataJSON, err := json.Marshal(&data)
 	if err != nil {
 		log.L.WithFields(logrus.Fields{
-			"remoteAddress": c.Socket().RemoteAddr(),
+			"remoteAddress": s.RemoteAddr(),
 			"options":       opts,
 		}).Warningf("client request: module method call: failed to trigger error callback: %v", err)
 
@@ -276,12 +275,12 @@ func triggerErrorCallback(c *glue.Channel, opts *callOpts, cbErr error) {
 	}
 
 	// Send the trigger request to the client.
-	c.Write(string(dataJSON))
+	s.chanCall.Write(string(dataJSON))
 }
 
 // This method does not return an error.
 // Instead errors are logged.
-func triggerCleanupCallback(c *glue.Channel, opts *callOpts) {
+func triggerCleanupCallback(s *Socket, opts *callOpts) {
 	// Skip if no callback ID is set.
 	if len(opts.CallbackID) == 0 {
 		return
@@ -300,7 +299,7 @@ func triggerCleanupCallback(c *glue.Channel, opts *callOpts) {
 	dataJSON, err := json.Marshal(&data)
 	if err != nil {
 		log.L.WithFields(logrus.Fields{
-			"remoteAddress": c.Socket().RemoteAddr(),
+			"remoteAddress": s.RemoteAddr(),
 			"options":       opts,
 		}).Warningf("client request: module method call: failed to trigger cleanup callback: %v", err)
 
@@ -308,5 +307,5 @@ func triggerCleanupCallback(c *glue.Channel, opts *callOpts) {
 	}
 
 	// Send the trigger request to the client.
-	c.Write(string(dataJSON))
+	s.chanCall.Write(string(dataJSON))
 }

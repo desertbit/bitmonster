@@ -1,4 +1,3 @@
-- On client reconnect register the callbacks and events.
 - Auto Migration tool
 - on logout stop all watchers on the server side!
 - Implement protocol version check.

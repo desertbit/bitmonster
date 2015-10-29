@@ -53,6 +53,16 @@ func newContext(s *Socket, m *Module, paramDataJSON string) *Context {
 	}
 }
 
+// Socket returns the socket of the context.
+func (c *Context) Socket() *Socket {
+	return c.socket
+}
+
+// Module returns the module of the context.
+func (c *Context) Module() *Module {
+	return c.module
+}
+
 // Data sets the data value which is passed finally to the client.
 func (c *Context) Data(d interface{}) {
 	c.data = d
@@ -84,11 +94,6 @@ func (c *Context) Decode(v interface{}) error {
 	}
 
 	return nil
-}
-
-// Module returns the module of the context.
-func (c *Context) Module() *Module {
-	return c.module
 }
 
 // TriggerEvent triggers an event of the module.

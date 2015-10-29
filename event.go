@@ -86,7 +86,45 @@ func (e *Event) Trigger(data ...interface{}) error {
 	return nil
 }
 
-func (e *Event) TriggerFor(data ...interface{}) error {
+// TriggerSocket triggers the event only for the specified socket.
+// Pass optional one variadic parameter value.
+func (e *Event) TriggerSocket(socket *Socket, data ...interface{}) error {
+	return e.TriggerSockets([]*Socket{socket}, data...)
+}
+
+// TriggerSockets triggers the event only for the specified sockets.
+// Pass optional one variadic parameter value.
+func (e *Event) TriggerSockets(sockets []*Socket, data ...interface{}) error {
+	var dataJSON string
+
+	// Check if a data parameter was passed.
+	if len(data) > 0 {
+		// Marshal the data to JSON.
+		dataJSONBytes, err := json.Marshal(data[0])
+		if err != nil {
+			return fmt.Errorf("failed to marshal event trigger data to JSON: %v", err)
+		}
+
+		dataJSON = string(dataJSONBytes)
+	}
+
+	// Lock the listeners mutex.
+	e.listenersMutex.Lock()
+	defer e.listenersMutex.Unlock()
+
+	// Trigger the event listeners for the specified sockets.
+	for _, s := range sockets {
+		// Get the listener by the socket ID.
+		l, ok := e.listeners[s.ID()]
+		if !ok {
+			// Ignore the error if no listeners are registered for the socket.
+			continue
+		}
+
+		// Trigger the event listener.
+		l.Trigger(dataJSON)
+	}
+
 	return nil
 }
 

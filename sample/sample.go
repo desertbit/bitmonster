@@ -60,6 +60,8 @@ func main() {
 	m, err := bitmonster.NewModule("users")
 	bitmonster.Fatal(err)
 
+	bitmonster.OnNewSocket(onNewSocket)
+
 	// ?
 	// m.addHooks(&auth{})
 
@@ -92,6 +94,10 @@ func main() {
 	bitmonster.Fatal(bitmonster.Run())
 }
 
+func onNewSocket(s *bitmonster.Socket) {
+	fmt.Printf("new socket: %s", s.ID())
+}
+
 func getUsers(c *bitmonster.Context) error {
 	println("getUsers")
 
@@ -121,6 +127,12 @@ func getUsers(c *bitmonster.Context) error {
 
 	// Shortcut:
 	err = c.TriggerEvent("onNew", v)
+	if err != nil {
+		return err
+	}
+
+	// Only this socket.
+	err = e.TriggerSocket(c.Socket(), v)
 	if err != nil {
 		return err
 	}

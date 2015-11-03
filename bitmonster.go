@@ -29,8 +29,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/desertbit/bitmonster/db"
 	"github.com/desertbit/bitmonster/log"
 	"github.com/desertbit/bitmonster/settings"
+
 	"github.com/desertbit/glue"
 )
 
@@ -73,7 +75,7 @@ func Fatal(err error) {
 	log.L.Fatalln(err)
 }
 
-// Init initializes the BitMonster runtime.
+// Init initializes the BitMonster runtime and connects to the database.
 func Init() error {
 	// Load the settings from the environment variables.
 	err := settings.LoadFromENV()
@@ -132,6 +134,11 @@ func Init() error {
 
 	// Set the event function to handle new incoming socket connections.
 	server.OnNewSocket(onNewSocket)
+
+	// Connect to the database.
+	if err = db.Connect(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -201,4 +208,7 @@ func release() {
 	if server != nil {
 		server.Release()
 	}
+
+	// Close the database session.
+	db.Close()
 }

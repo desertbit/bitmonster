@@ -21,6 +21,7 @@ package settings
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/desertbit/bitmonster/log"
 
@@ -43,6 +44,13 @@ var (
 
 		ListenAddress: ":9000",
 		SocketType:    SocketTypeTCP,
+
+		DBAddress: "localhost:28015",
+		DBName:    "test",
+		DBAuthKey: "",
+		DBMaxIdle: 50,
+		DBMaxOpen: 50,
+		DBTimeout: time.Minute,
 	}
 )
 
@@ -69,6 +77,15 @@ type settings struct {
 	// key: url
 	// value: path
 	FileServer FileServer
+
+	// Database settings.
+	DBAddress   string        `envconfig:"DB_ADDRESS"`
+	DBAddresses []string      `envconfig:"DB_ADDRESSES"`
+	DBName      string        `envconfig:"DB_NAME"`
+	DBAuthKey   string        `envconfig:"DB_AUTH_KEY"`
+	DBMaxIdle   int           `envconfig:"DB_MAX_IDLE"`
+	DBMaxOpen   int           `envconfig:"DB_MAX_OPEN"`
+	DBTimeout   time.Duration `envconfig:"DB_TIMEOUT"`
 }
 
 //##############//

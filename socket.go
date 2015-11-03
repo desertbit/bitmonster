@@ -122,11 +122,6 @@ func OnNewSocket(f OnNewSocketFunc) {
 	emitter.On(emitterOnNewSocket, f)
 }
 
-// OnceNewSocket triggers the event function only once.
-func OnceNewSocket(f OnNewSocketFunc) {
-	emitter.Once(emitterOnNewSocket, f)
-}
-
 // OffNewSocket remove the event listener again.
 func OffNewSocket(f OnNewSocketFunc) {
 	emitter.Off(emitterOnNewSocket, f)
@@ -135,11 +130,6 @@ func OffNewSocket(f OnNewSocketFunc) {
 // OnCloseSocket is triggered if a socket connection is closed.
 func OnCloseSocket(f OnNewSocketFunc) {
 	emitter.On(emitterOnCloseSocket, f)
-}
-
-// OnceCloseSocket triggers the event function only once.
-func OnceCloseSocket(f OnNewSocketFunc) {
-	emitter.Once(emitterOnCloseSocket, f)
 }
 
 // OffCloseSocket remove the event listener again.

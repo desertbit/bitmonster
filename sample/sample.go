@@ -125,12 +125,6 @@ func getUsers(c *bitmonster.Context) error {
 		return err
 	}
 
-	// Shortcut:
-	err = c.TriggerEvent("onNew", v)
-	if err != nil {
-		return err
-	}
-
 	// Only this socket.
 	err = e.TriggerSocket(c.Socket(), v)
 	if err != nil {

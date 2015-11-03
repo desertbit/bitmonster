@@ -95,21 +95,3 @@ func (c *Context) Decode(v interface{}) error {
 
 	return nil
 }
-
-// TriggerEvent triggers an event of the module.
-// Pass optional one variadic parameter value.
-func (c *Context) TriggerEvent(name string, data ...interface{}) error {
-	// Get the event.
-	e, err := c.module.Event(name)
-	if err != nil {
-		return err
-	}
-
-	// Trigger the event.
-	err = e.Trigger(data...)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}

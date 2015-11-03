@@ -19,9 +19,10 @@
 package bitmonster
 
 import (
+	"github.com/desertbit/bitmonster/log"
+
 	"github.com/chuckpreslar/emission"
 	"github.com/desertbit/glue"
-	"github.com/desertbit/glue/log"
 )
 
 //#################//

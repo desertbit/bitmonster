@@ -24,8 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/desertbit/bitmonster/log"
+
 	"github.com/Sirupsen/logrus"
-	"github.com/desertbit/glue/log"
 )
 
 const (

@@ -1,13 +1,12 @@
 'use strict';
 
-var gulp 		    = require('gulp'),
-  concat        = require('gulp-concat'),
-  bower         = require('gulp-bower'),
-	sourcemaps 	  = require('gulp-sourcemaps'),
-	uglify 		    = require('gulp-uglify'),
-	gulpif 		    = require('gulp-if'),
-  fileinclude   = require('gulp-file-include'),
-  minifyCss     = require('gulp-minify-css');
+var gulp 		 = require('gulp'),
+    bower        = require('gulp-bower'),
+    sourcemaps 	 = require('gulp-sourcemaps'),
+    uglify 		 = require('gulp-uglify'),
+    gulpif 		 = require('gulp-if'),
+    fileinclude  = require('gulp-file-include'),
+    sass 	     = require('gulp-sass');
 
 var debug = false;
 
@@ -30,17 +29,25 @@ gulp.task('js', ['bower'], function () {
 })
 
 
-gulp.task('minify-css', function() {
-  return gulp.src('src/css/*.css')
-    .pipe(minifyCss())
-    .pipe(concat('BitMonster.css'))
+gulp.task('sass', function () {
+  var opts = {
+    outputStyle: "compressed"
+  };
+
+  var debugOpts = {
+    outputStyle: "expanded"
+  };
+
+  gulp.src('src/css/*.scss')
+    .pipe(gulpif(debug, sass(debugOpts).on('error', sass.logError)))
+    .pipe(gulpif(!debug, sass(opts).on('error', sass.logError)))
     .pipe(gulp.dest('./dist/'));
 });
 
 
 gulp.task('watch', ['default'], function () {
   gulp.watch(['./src/*.js', './src/**/*.js'], ['js']);
-  gulp.watch(['./src/*.css', './src/**/*.css'], ['minify-css']);
+  gulp.watch(['./src/*.css', './src/**/*.css'], ['sass']);
 });
 
 
@@ -48,6 +55,6 @@ gulp.task('debug', function() {
 	debug = true;
 });
 
-gulp.task('default', ['minify-css', 'bower', 'js'], function() {
+gulp.task('default', ['sass', 'bower', 'js'], function() {
 
 });

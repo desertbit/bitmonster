@@ -22,10 +22,11 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/desertbit/bitmonster"
 	"github.com/desertbit/bitmonster/settings"
+
+	"github.com/desertbit/bitmonster/auth"
 )
 
 // TODO Implement:
@@ -38,6 +39,7 @@ import (
 // - ? The upper implementation should register and add events to an internal module array.
 // - ? This internal registration of module events should add the possibility to bind events also on the Go side.
 
+/*
 type auth struct{}
 
 func (a *auth) Hook(c *bitmonster.Context) error {
@@ -45,6 +47,7 @@ func (a *auth) Hook(c *bitmonster.Context) error {
 	//c.Error("Error Hook")
 	return nil
 }
+*/
 
 func main() {
 	// Add the custom fileserver paths.
@@ -60,34 +63,35 @@ func main() {
 	m, err := bitmonster.NewModule("users")
 	bitmonster.Fatal(err)
 
-	bitmonster.OnNewSocket(onNewSocket)
-
 	// ?
 	// m.addHooks(&auth{})
 
 	// Add module methods.
-	m.AddMethod("get", getUsers, &auth{})
+	m.AddMethod("get", getUsers, auth.MustAdminGroup())
 
 	// Add events.
-	m.AddEvent("onNew", &auth{})
+	e := m.AddEvent("onNew")
 
 	//######
-	// Get the event.
-	e, err := m.Event("onNew")
+	// OR get the event.
+	e, err = m.Event("onNew")
 	if err != nil {
 		bitmonster.Fatal(err)
 	}
 
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			// Trigger the event.
-			err = e.Trigger()
-			if err != nil {
-				bitmonster.Fatal(err)
+	_ = e
+
+	/*
+		go func() {
+			for {
+				time.Sleep(time.Second)
+				// Trigger the event.
+				err = e.Trigger()
+				if err != nil {
+					bitmonster.Fatal(err)
+				}
 			}
-		}
-	}()
+		}()*/
 	//#####
 
 	// Start the BitMonster server.

@@ -16,26 +16,41 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#bm-conn-lost-widget {
-	display: none;
-    position: fixed;
-    z-index: 10001;
-    margin: 0;
-    padding: 0;
-    width: 96%;
-    right: 2%;
-    top: 2%;
-    cursor: pointer;
-    background-color: #458ce3;
+package bitmonster
 
-    // Display different size for larger screens.
-    @media screen and (min-width: 500px) {
-        right: 40px;
-        top: 40px;
-        width: 400px;
-    }
+import (
+	"github.com/desertbit/bitmonster/log"
+
+	"github.com/chuckpreslar/emission"
+)
+
+//#################//
+//### Constants ###//
+//#################//
+
+const (
+	emitterMaxListeners = 30
+)
+
+//#################//
+//### Variables ###//
+//#################//
+
+var (
+	emitter *emission.Emitter
+)
+
+//###############//
+//### Private ###//
+//###############//
+
+func init() {
+	// Create a new emitter, set the recover function and the max listeners.
+	emitter = emission.NewEmitter().
+		RecoverWith(recoverEmitter).
+		SetMaxListeners(emitterMaxListeners)
 }
 
-#bm-conn-lost-widget.show {
-	display: table;
+func recoverEmitter(event interface{}, listener interface{}, err error) {
+	log.L.Error("emitter event: %v: listener: %v: %v", event, listener, err)
 }

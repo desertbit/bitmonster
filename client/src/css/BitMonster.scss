@@ -1,0 +1,146 @@
+/*
+ *  BitMonster - A Monster handling your Bits
+ *  Copyright (C) 2015  Roland Singer <roland.singer[at]desertbit.com>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+$notification-bg-color: #E36645;
+$notification-shadow-color: rgba(0,0,0,.425);
+$notification-font-color: #E4E4E4;
+
+$notification-close-bg-color: #E4E4E4;
+$notification-close-color: #A1A1A1;
+$notification-close-hover-color: $notification-bg-color;
+
+
+.bm-notification {
+	display: none;
+    position: fixed;
+    z-index: 10001;
+    margin: 0;
+    padding: 10px;
+    width: auto;
+    right: 2%;
+	left: 2%;
+    top: 2%;
+	border-radius: 3px;
+    background-color: $notification-bg-color;
+	pointer-events: none;
+	opacity: 0;
+	transition: all .2s ease-in;
+
+	-webkit-box-shadow: 0 3px 5px $notification-shadow-color;
+	-moz-box-shadow: 0 3px 5px $notification-shadow-color;
+	box-shadow: 0 3px 5px $notification-shadow-color;
+
+    @media screen and (min-width: 500px) {
+        right: 40px;
+		left: auto;
+        top: 40px;
+        width: 400px;
+    }
+
+	&.bm-clickable {
+		cursor: pointer;
+	}
+
+	span, p {
+		color: $notification-font-color;
+		margin: 0;
+		padding: 0;
+		font-size: 18px;
+		font-family: "Helvetica", "Arial", "Calibri", sans-serif;
+	}
+
+	span {
+		font-size: 14px;
+	}
+
+	> div {
+		float: right;
+		position: relative;
+		margin: 0;
+		padding: 0;
+		width: 10px;
+		height: 10px;
+		overflow: hidden;
+		background: $notification-close-color;
+		border-radius: 2px;
+		border: solid 2px $notification-close-bg-color;
+		transition: all .3s ease-out;
+		cursor: pointer;
+
+		-webkit-transition-duration: 0.5s;
+		transition-duration: 0.5s;
+
+		&:hover{
+		  background: $notification-close-hover-color;
+		  transform: rotate(90deg);
+		}
+
+		b {
+			display: block;
+			position: absolute;
+			height: 0;
+			width: 0;
+			padding: 0;
+			margin: 0;
+			border: solid 5px rgba(255,255,255,0);
+
+			&:nth-child(1){
+				border-top-color: $notification-close-bg-color;
+				top: -2px;
+			}
+			&:nth-child(2){
+				border-left-color: $notification-close-bg-color;
+				left: -2px;
+			}
+			&:nth-child(3){
+				border-bottom-color: $notification-close-bg-color;
+				bottom: -2px;
+			}
+			&:nth-child(4){
+				border-right-color: $notification-close-bg-color;
+				right: -2px;
+			}
+		}
+	}
+
+	&.show {
+		display: block;
+		-webkit-animation-name: bm-anim-scale;
+		animation-name: bm-anim-scale;
+		-webkit-animation-duration: 0.25s;
+		animation-duration: 0.25s;
+		pointer-events: all;
+		opacity: 1;
+	}
+
+	&.hide {
+		opacity: 0;
+		-webkit-animation-direction: reverse; /* Chrome, Safari, Opera */
+		animation-direction: reverse;
+	}
+
+	@-webkit-keyframes bm-anim-scale {
+	    0% { opacity: 0; -webkit-transform: translate3d(0,40px,0) scale3d(0.1,0.6,1); }
+	    100% { opacity: 1; -webkit-transform: translate3d(0,0,0) scale3d(1,1,1); }
+	}
+
+	@keyframes bm-anim-scale {
+		0% { opacity: 0; -webkit-transform: translate3d(0,40px,0) scale3d(0.1,0.6,1); transform: translate3d(0,40px,0) scale3d(0.1,0.6,1); }
+		100% { opacity: 1; -webkit-transform: translate3d(0,0,0) scale3d(1,1,1); transform: translate3d(0,0,0) scale3d(1,1,1); }
+	}
+}

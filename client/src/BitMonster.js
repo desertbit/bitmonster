@@ -22,7 +22,7 @@
 // TODO: Create a developers html api.
 // TODO: if registered with event object, add possibility to disable it again.
 
-// Include the glue client library directly.
+// Include the required libraries directly.
 @@include('../bower_components/glue-socket/client/dist/glue.js')
 
 // Include the polyfills.
@@ -38,10 +38,12 @@ var BitMonster = function(host) {
     // Include the dependencies.
     @@include('./utils.js')
     @@include('./translate/translate.js')
-    @@include('./ui/ConnLostWidget.js')
+    @@include('./ui/notification.js')
+    @@include('./ui/connlost.js')
     @@include('./scope.js')
     @@include('./socket.js')
     @@include('./module.js')
+    @@include('./auth.js')
 
     // Return the newly created BitMonster object.
     return bm;

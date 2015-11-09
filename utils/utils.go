@@ -20,9 +20,12 @@
 package utils
 
 import (
+	"crypto/rand"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/satori/go.uuid"
 )
 
 //#################//
@@ -36,6 +39,22 @@ const (
 //########################//
 //### Public Functions ###//
 //########################//
+
+// UUID generates an UUID Version 4.
+func UUID() string {
+	return uuid.NewV4().String()
+}
+
+// RandomString generates a random string.
+func RandomString(n int) string {
+	const alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	var bytes = make([]byte, n)
+	rand.Read(bytes)
+	for i, b := range bytes {
+		bytes[i] = alphanum[b%byte(len(alphanum))]
+	}
+	return string(bytes)
+}
 
 // UnmarshalValues splits two values from a single string.
 // This function is chainable to extract multiple values.

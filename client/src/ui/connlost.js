@@ -21,45 +21,21 @@
  */
 
 
-var ConnLostWidget = (function () {
+var connlost = (function () {
     /*
      * Variables
      */
 
 	var instance = {}, // Our public instance object returned by this function.
-		widget,
-		widgetBody = 	'<div id="bm-conn-lost-widget">' +
-							'<i class="fa fa-bolt fa-2x"></i>' +
-							'<span><p></p><small></small></span>' +
-						'</div>';
+		timeout = false;
 
+	var notify = bm.notification({
+		title: tr.socket.ConnLostTitle,
+		text: tr.socket.ConnLostText,
+		destroyOnClose: false,
+		hideClose: true
+	});
 
-
-    /*
-     * Private Functions
-     */
-
-	var setTitle = function(str) {
-		widget.find("p").text(str);
-	};
-
-	var setText = function(str) {
-		widget.find("small").text(str);
-	};
-
-	var createWidgetIfNotExists = function() {
-		// Try to obtain the widget object.
-		widget = $('#bm-conn-lost-widget');
-
-		// Skip if it exists..
-		if (widget.length) {
-			return;
-		}
-
-		// Create it, hide it and prepend it to the document body.
-		widget = $(widgetBody);
-		$('body').prepend(widget);
-	};
 
 
 
@@ -68,16 +44,24 @@ var ConnLostWidget = (function () {
      */
 
     instance.show = function() {
-    	// Create the widget if required.
-    	createWidgetIfNotExists();
+		if (timeout !== false) {
+			return;
+		}
 
-    	// Set the title and text.
-		setTitle(tr.ConnLostWidget.Title);
-		setText(tr.ConnLostWidget.Title);
-
-		// Show it by adding the show class.
-		widget.addClass('show');
+		timeout = setTimeout(function() {
+			timeout = false;
+			notify.show();
+		}, 1500);
     };
+
+	instance.hide = function() {
+		if (timeout !== false) {
+			clearTimeout(timeout);
+			timeout = false;
+		}
+
+		notify.hide();
+	};
 
 
 	return instance;

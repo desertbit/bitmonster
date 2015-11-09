@@ -146,19 +146,20 @@ func handleCallRequest(s *Socket, data string) {
 	// Create a new context value.
 	context := newContext(s, m, dataJSON)
 
+	// Debug log.
+	log.L.WithFields(logrus.Fields{
+		"remoteAddress": s.RemoteAddr(),
+		"module":        opts.Module,
+		"method":        opts.Method,
+	}).Debugf("method call")
+
 	// Call the hooks first.
 	for _, hook := range mc.hooks {
 		// Trigger the hook.
 		err = hook.Hook(context)
 		if err != nil {
-			log.L.WithFields(logrus.Fields{
-				"remoteAddress": s.RemoteAddr(),
-				"module":        opts.Module,
-				"method":        opts.Method,
-			}).Warningf("client request: module method call: hook error: %v", err)
-
 			// Trigger the error callback on the client-side.
-			triggerErrorCallback(s, opts, context.err)
+			triggerErrorCallback(s, opts, context.err, err)
 			return
 		}
 
@@ -172,14 +173,8 @@ func handleCallRequest(s *Socket, data string) {
 	// Call the module function with the context.
 	err = mc.method(context)
 	if err != nil {
-		log.L.WithFields(logrus.Fields{
-			"remoteAddress": s.RemoteAddr(),
-			"module":        opts.Module,
-			"method":        opts.Method,
-		}).Warningf("client request: module method call: error: %v", err)
-
 		// Trigger the error callback on the client-side.
-		triggerErrorCallback(s, opts, context.err)
+		triggerErrorCallback(s, opts, context.err, err)
 		return
 	}
 
@@ -236,7 +231,26 @@ func triggerSuccessCallback(s *Socket, opts *callOpts, methodData interface{}) {
 
 // This method does not return an error.
 // Instead errors are logged.
-func triggerErrorCallback(s *Socket, opts *callOpts, cbErr error) {
+// Optional pass the real error.
+func triggerErrorCallback(s *Socket, opts *callOpts, cbErr error, realErr ...error) {
+	// Log.
+	if len(realErr) > 0 {
+		log.L.WithFields(logrus.Fields{
+			"remoteAddress": s.RemoteAddr(),
+			"module":        opts.Module,
+			"method":        opts.Method,
+			"contextError":  cbErr,
+			"error":         realErr[0],
+		}).Warningf("method error")
+	} else {
+		log.L.WithFields(logrus.Fields{
+			"remoteAddress": s.RemoteAddr(),
+			"module":        opts.Module,
+			"method":        opts.Method,
+			"contextError":  cbErr,
+		}).Warningf("method error")
+	}
+
 	// Skip if no callback ID is set.
 	if len(opts.CallbackID) == 0 {
 		return

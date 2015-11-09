@@ -28,6 +28,7 @@ import (
 )
 
 var (
+	// Session is the database session.
 	Session *r.Session
 )
 
@@ -35,6 +36,7 @@ var (
 //### Public ###//
 //##############//
 
+// Connect to the database.
 func Connect() (err error) {
 	// Connext to the database server.
 	Session, err = r.Connect(r.ConnectOpts{
@@ -62,6 +64,19 @@ func Connect() (err error) {
 	return nil
 }
 
+// Prepare the database before using it.
+// This will create or migrate the database if required.
+// Registered managers are called within this call.
+func Prepare() error {
+	err := prepareDatabase()
+	if err != nil {
+		return fmt.Errorf("failed to prepare database: %v", err)
+	}
+
+	return nil
+}
+
+// Close the database.
 func Close() {
 	if Session == nil {
 		return
@@ -71,4 +86,76 @@ func Close() {
 	if err != nil {
 		log.L.Warningf("error while closing database session: %v", err)
 	}
+}
+
+//#################################//
+//### Public - Helper Functions ###//
+//#################################//
+
+func CreateTableIfNotExists(table string) error {
+	// Check if the table exists.
+	cur, err := r.TableList().Run(Session)
+	if err != nil {
+		return err
+	}
+	defer cur.Close()
+
+	tableName := ""
+	for cur.Next(&tableName) {
+		if tableName == table {
+			return nil
+		}
+	}
+
+	return CreateTable(table)
+}
+
+func CreateTables(tables ...string) error {
+	var err error
+	for _, t := range tables {
+		if err = CreateTable(t); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CreateTable(table string) error {
+	// Create the table.
+	log.L.Infof("Database: creating table %s", table)
+	_, err := r.TableCreate(table).RunWrite(Session)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//##################################//
+//### Private - Helper Functions ###//
+//##################################//
+
+func createDatabaseIfNotExists(name string) error {
+	// Check if the database exists.
+	cur, err := r.DBList().Run(Session)
+	if err != nil {
+		return err
+	}
+
+	dbName := ""
+	for cur.Next(&dbName) {
+		if dbName == name {
+			return nil
+		}
+	}
+
+	// Create the database.
+	log.L.Infof("Database: creating database %s", name)
+	_, err = r.DBCreate(name).RunWrite(Session)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

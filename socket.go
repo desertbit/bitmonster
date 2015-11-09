@@ -19,7 +19,7 @@
 package bitmonster
 
 import (
-	"github.com/desertbit/bitmonster/log"
+	"sync"
 
 	"github.com/chuckpreslar/emission"
 	"github.com/desertbit/glue"
@@ -33,17 +33,8 @@ const (
 	channelCall  = "call"
 	channelEvent = "event"
 
-	emitterMaxListeners  = 30
 	emitterOnNewSocket   = "onNewSocket"
 	emitterOnCloseSocket = "onCloseSocket"
-)
-
-//#################//
-//### Variables ###//
-//#################//
-
-var (
-	emitter *emission.Emitter
 )
 
 //####################//
@@ -70,6 +61,9 @@ type Socket struct {
 	chanEvent *glue.Channel
 
 	emitter *emission.Emitter
+
+	values      map[interface{}]interface{}
+	valuesMutex sync.Mutex
 }
 
 // ID returns the socket's unique ID.
@@ -114,9 +108,74 @@ func (s *Socket) ClosedChan() ClosedChan {
 	return ClosedChan(s.socket.ClosedChan())
 }
 
+// Value returns a custom value previously set by the key.
+// Returns nil if it does not exists.
+// One variadic function is called if no value exists for the given key.
+// The return value of this function is the new value for the key.
+// This operation is thread-safe.
+func (s *Socket) Value(key interface{}, f ...func() interface{}) interface{} {
+	// Lock the mutex.
+	s.valuesMutex.Lock()
+	defer s.valuesMutex.Unlock()
+
+	// Get the value.
+	v, ok := s.values[key]
+	if !ok {
+		// If no value is found and the create function
+		// is set, then call the function and set the new value.
+		if len(f) > 0 {
+			v := f[0]()
+			s.values[key] = v
+			return v
+		}
+
+		return nil
+	}
+
+	return v
+}
+
+// SetValue sets a custom value with a key.
+func (s *Socket) SetValue(key interface{}, value interface{}) {
+	// Lock the mutex.
+	s.valuesMutex.Lock()
+	defer s.valuesMutex.Unlock()
+
+	// Set the value.
+	s.values[key] = value
+}
+
+// DeleteValue removes a custom value with a key.
+func (s *Socket) DeleteValue(key interface{}) {
+	// Lock the mutex.
+	s.valuesMutex.Lock()
+	defer s.valuesMutex.Unlock()
+
+	// Remove the value.
+	delete(s.values, key)
+}
+
 //##############//
 //### Public ###//
 //##############//
+
+// GetSocket obtains the socket by its ID.
+// Returns nil if not found.
+func GetSocket(id string) *Socket {
+	// Get the glue socket from the glue server.
+	gs := server.GetSocket(id)
+	if gs == nil {
+		return nil
+	}
+
+	// Get the BitMonster socket which is saved in the glue socket value.
+	s, ok := gs.Value.(*Socket)
+	if !ok {
+		return nil
+	}
+
+	return s
+}
 
 // OnNewSocket is triggered during each new socket connection.
 func OnNewSocket(f OnNewSocketFunc) {
@@ -142,17 +201,6 @@ func OffCloseSocket(f OnNewSocketFunc) {
 //### Private ###//
 //###############//
 
-func init() {
-	// Create a new emitter, set the recover function and the max listeners.
-	emitter = emission.NewEmitter().
-		RecoverWith(recoverEmitter).
-		SetMaxListeners(emitterMaxListeners)
-}
-
-func recoverEmitter(event interface{}, listener interface{}, err error) {
-	log.L.Error("emitter event: %v: listener: %v: %v", event, listener, err)
-}
-
 // onNewSocket is triggered as soon as a new socket connects.
 func onNewSocket(s *glue.Socket) {
 	// Create the BitMonster Socket value.
@@ -160,7 +208,11 @@ func onNewSocket(s *glue.Socket) {
 		socket:    s,
 		chanCall:  s.Channel(channelCall),
 		chanEvent: s.Channel(channelEvent),
+		values:    make(map[interface{}]interface{}),
 	}
+
+	// Save itself to the glue Value.
+	s.Value = socket
 
 	// Set the emitter.
 	// Create a new emitter, set the recover function and the max listeners.

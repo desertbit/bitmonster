@@ -36,50 +36,47 @@ var socket = (function () {
     	return;
     }
 
-    // ###############################################
-    // TODO
-
     socket.on("connected", function() {
-        console.log("connected");
+        connlost.hide();
     });
 
     socket.on("connecting", function() {
-        console.log("connecting");
-    });
-
-    socket.on("disconnected", function() {
-        console.log("disconnected");
+        connlost.show();
     });
 
     socket.on("reconnecting", function() {
-        console.log("reconnecting");
+        connlost.show();
+    });
+
+    socket.on("disconnected", function() {
+        connlost.hide();
+
+        var notify = bm.notification({
+            title: tr.socket.DisconnectedTitle,
+            text: tr.socket.DisconnectedText,
+            hideClose: true
+        });
+
+        notify.onClick(function() {
+            notify.destroy();
+            socket.reconnect();
+        });
+
+        notify.show();
     });
 
     socket.on("error", function(e, msg) {
-        console.log("error: " + msg);
+        // Just log the error.
+        console.log("BitMonster: socket error: " + msg);
     });
 
-    socket.on("connect_timeout", function() {
-        console.log("connect_timeout");
+    socket.on("discard_send_buffer", function() {
+        bm.notification({
+    		title: tr.socket.DiscardNotSendDataTitle,
+    		text: tr.socket.DiscardNotSendDataText
+    	}).show();
     });
 
-    socket.on("timeout", function() {
-        console.log("timeout");
-    });
-
-    socket.on("discard_send_buffer", function(e, buf) {
-        console.log("discard_send_buffer: ");
-        for (var i = 0; i < buf.length; i++) {
-            console.log("  i: " + buf[i]);
-        }
-    });
-
-    socket.onMessage(function(data) {
-        console.log("onMessage: " + data);
-    });
-
-    // END TODO
-    // ###############################################
 
     // Return the newly created socket.
     return socket;

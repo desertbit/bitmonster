@@ -16,32 +16,45 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package bitmonster
+package auth
 
 import (
-	"github.com/desertbit/bitmonster/log"
+	"github.com/desertbit/bitmonster"
 )
 
 var (
-	initErrors []error
+	mustGroupAdminHook = MustGroup(AdminGroup)
 )
 
-// initError tells BitMonster that an initialization error occurred.
-// The initialization process is done after BitMonster.Run is called.
-// If any initError occurred, then the application aborts and logs the error.
-// This method is not thread-safe!
-func initError(err error) {
-	initErrors = append(initErrors, err)
-}
+//##############//
+//### Public ###//
+//##############//
 
-// hasInitErrors returns a boolean whenever there are initialization errors.
-func hasInitErrors() bool {
-	return len(initErrors) != 0
-}
-
-// Log the initialization errors.
-func logInitErrors() {
-	for _, err := range initErrors {
-		log.L.Errorf("initialization error: %v", err)
+// MustGroup returns a BitMonster Hook which requires an authenticated
+// user who is member of one of the passed groups.
+func MustGroup(groups ...string) bitmonster.Hook {
+	h := &hook{
+		groups: groups,
 	}
+
+	return h
+}
+
+// MustAdminGroup returns a BitMonster Hook which requires an authenticated
+// user who is member of the admin group.
+func MustAdminGroup() bitmonster.Hook {
+	return mustGroupAdminHook
+}
+
+//######################//
+//### Private - Hook ###//
+//######################//
+
+type hook struct {
+	groups []string
+}
+
+func (h *hook) Hook(c *bitmonster.Context) error {
+
+	return nil
 }

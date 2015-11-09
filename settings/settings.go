@@ -37,6 +37,12 @@ const (
 	SocketTypeUnix = "unix"
 )
 
+const (
+	// Default authentication keys:
+	defaultAuthHashKey  = "R7DqYdgWlztQ06diRM4z7ByuDwfiAveJLxTwAEDHFvgjkA4CcPrWBhZk6FJIBuDs"
+	defaultAuthBlockKey = "2Mox41MlNDHOzShGfiO6AMQ3isx5hz9r"
+)
+
 var (
 	// Create the initial settings value with default values.
 	Settings = settings{
@@ -51,6 +57,10 @@ var (
 		DBMaxIdle: 50,
 		DBMaxOpen: 50,
 		DBTimeout: time.Minute,
+
+		AuthHashKey:       defaultAuthHashKey,
+		AuthBlockKey:      defaultAuthBlockKey,
+		AuthSessionMaxAge: 60 * 60 * 24 * 14, // 14 Days
 	}
 )
 
@@ -78,7 +88,11 @@ type settings struct {
 	// value: path
 	FileServer FileServer
 
-	// Database settings.
+	// Whenever this application is accessible through a secure HTTPs connection.
+	// This flag affects some important security mechanisms, as settings the secure flag on cookies.
+	SecureHttpsAccess bool
+
+	// Database settings:
 	DBAddress   string        `envconfig:"DB_ADDRESS"`
 	DBAddresses []string      `envconfig:"DB_ADDRESSES"`
 	DBName      string        `envconfig:"DB_NAME"`
@@ -86,6 +100,17 @@ type settings struct {
 	DBMaxIdle   int           `envconfig:"DB_MAX_IDLE"`
 	DBMaxOpen   int           `envconfig:"DB_MAX_OPEN"`
 	DBTimeout   time.Duration `envconfig:"DB_TIMEOUT"`
+
+	// Authentication settings:
+	// The AuthHashKey is used to authenticate the authentication data value using HMAC.
+	// It is recommended to use a key with 32 or 64 bytes.
+	AuthHashKey string
+	// The AuthBlockKey is used to encrypt the authenticate data.
+	// The length must correspond to the block size of the encryption algorithm.
+	// For AES, used by default, valid lengths are 16, 24, or 32 bytes to select AES-128, AES-192, or AES-256.
+	AuthBlockKey string
+	// The maximum authenticated session age in seconds.
+	AuthSessionMaxAge int
 }
 
 //##############//
@@ -113,6 +138,34 @@ func Load(path string) error {
 	_, err := toml.DecodeFile(path, &Settings)
 	if err != nil {
 		return fmt.Errorf("failed to parse settings file '%s': %v", path, err)
+	}
+
+	return nil
+}
+
+// Prepare the settings and validate them.
+func Prepare() error {
+	// Check if the length of the auth keys are valid.
+	l := len([]byte(Settings.AuthHashKey))
+	if l != 32 && l != 64 {
+		return fmt.Errorf("settings: the authentication hash key has an invalid length of %v bytes! Valid lengths are 32 or 64 bytes...", l)
+	}
+	l = len([]byte(Settings.AuthBlockKey))
+	if l != 16 && l != 24 && l != 32 {
+		return fmt.Errorf("settings: the authentication block key has an invalid length of %v bytes! For AES, used by default, valid lengths are 16, 24, or 32 bytes to select AES-128, AES-192, or AES-256.", l)
+	}
+
+	// Print a warning if the default authentication keys are set.
+	if Settings.AuthHashKey == defaultAuthHashKey {
+		log.L.Warning("[WARNING] settings: the default authentication hash key is set! You should replace this with a secret key!")
+	}
+	if Settings.AuthBlockKey == defaultAuthBlockKey {
+		log.L.Warning("[WARNING] settings: the default authentication block key is set! You should replace this with a secret key!")
+	}
+
+	// Print a warning if the SecureHttpsAccess flag is false.
+	if !Settings.SecureHttpsAccess {
+		log.L.Warning("[WARNING] settings: the secure https access flag is false! You should provide a secure https access!")
 	}
 
 	return nil

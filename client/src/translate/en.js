@@ -17,7 +17,12 @@
  */
 
 {
-	ConnLostWidget: {
-		Title: "Connection Lost"
+	socket: {
+		ConnLostTitle: "Connection Lost",
+		ConnLostText:  "Trying to reconnect to Server...",
+		DiscardNotSendDataTitle: "Unsend Data",
+		DiscardNotSendDataText: "Not all data messages could be transmitted to the server!",
+		DisconnectedTitle: "Disconnected from Server",
+		DisconnectedText: "Click here to reconnect.",
 	}
 }

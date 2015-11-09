@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/desertbit/bitmonster/db"
 	"github.com/desertbit/bitmonster/log"
@@ -47,6 +48,7 @@ const (
 	// Private
 	// #######
 	socketHandleURL = "/bitmonster/"
+	emitterOnInit   = "onInit"
 )
 
 //#################//
@@ -54,8 +56,9 @@ const (
 //#################//
 
 var (
-	isShuttdingDown bool
-	releaseMutex    sync.Mutex
+	isReleased   bool
+	releasedChan = make(chan struct{})
+	releaseMutex sync.Mutex
 
 	// The glue socket server instance.
 	server *glue.Server
@@ -73,6 +76,13 @@ func Fatal(err error) {
 	}
 
 	log.L.Fatalln(err)
+}
+
+// OnInit is triggered during the BitMonster initialization process.
+func OnInit(f func()) {
+	// Bind them with once, because this event is triggered only once.
+	// Free unused memory...
+	emitter.Once(emitterOnInit, f)
 }
 
 // Init initializes the BitMonster runtime and connects to the database.
@@ -96,6 +106,11 @@ func Init() error {
 		}
 	}
 
+	// Prepare the settings.
+	if err = settings.Prepare(); err != nil {
+		return err
+	}
+
 	// Catch interrupt signals.
 	if settings.Settings.AutoCatchInterrupts {
 		go func() {
@@ -112,6 +127,16 @@ func Init() error {
 			// Exit the application
 			os.Exit(InterruptExitCode)
 		}()
+	}
+
+	// Connect to the database.
+	if err = db.Connect(); err != nil {
+		return err
+	}
+
+	// Prepare to the database.
+	if err = db.Prepare(); err != nil {
+		return err
 	}
 
 	// Create the glue options.
@@ -135,10 +160,8 @@ func Init() error {
 	// Set the event function to handle new incoming socket connections.
 	server.OnNewSocket(onNewSocket)
 
-	// Connect to the database.
-	if err = db.Connect(); err != nil {
-		return err
-	}
+	// Trigger the init event.
+	emitter.Emit(emitterOnInit)
 
 	return nil
 }
@@ -151,13 +174,6 @@ func Run() error {
 	// Just check if the init method was skipped.
 	if server == nil {
 		log.L.Fatalln("BitMonster is not initialized!")
-	}
-
-	// Check if initialization errors occurred.
-	if hasInitErrors() {
-		// Log the errors and abort.
-		logInitErrors()
-		return fmt.Errorf("initialization errors occurred")
 	}
 
 	log.L.Infoln("BitMonster Server running.")
@@ -186,6 +202,12 @@ func Run() error {
 	return nil
 }
 
+// ReleasedChan returns a blocking read-only channel which is closed (non-blocking)
+// during the application shutdown.
+func ReleasedChan() <-chan struct{} {
+	return releasedChan
+}
+
 //###############//
 //### Private ###//
 //###############//
@@ -196,12 +218,15 @@ func release() {
 	defer releaseMutex.Unlock()
 
 	// Check if already released.
-	if isShuttdingDown {
+	if isReleased {
 		return
 	}
 
 	// Set the flag.
-	isShuttdingDown = true
+	isReleased = true
+
+	// Close the channel to signalize a shutdown.
+	close(releasedChan)
 
 	// Block all new incomming connections and
 	// close all current connected sockets by releasing the server.
@@ -211,4 +236,7 @@ func release() {
 
 	// Close the database session.
 	db.Close()
+
+	// Wait a moment so goroutines have some time to release.
+	time.Sleep(1500 * time.Millisecond)
 }

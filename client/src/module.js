@@ -28,7 +28,7 @@ bm.module = (function() {
 
     var callbackIDLength      = 14,
         eventListenerIDLength = 10,
-        methodCallTimeout     = 7000; // 7 seconds
+        methodCallTimeout     = 10000; // 10 seconds
 
 
 
@@ -82,33 +82,19 @@ bm.module = (function() {
              cb.timeout = false;
          }
 
-         try {
-             // Determind the request type and call the callback.
-             if (data.type === "cleanup") {
-                 // Just return. The callback object was already removed from the map.
-                 return;
-             }
-             else if (data.type === "success" && cb.success) {
-                 if (data.data) {
-                     cb.success(data.data);
-                 } else {
-                     cb.success();
-                 }
-             }
-             else if (data.type === "error" && cb.error) {
-                 if (data.message) {
-                     cb.error(data.message);
-                 } else {
-                     cb.error();
-                 }
-             }
-             else {
-                 logError();
-             }
+         // Determind the request type and call the callback.
+         if (data.type === "cleanup") {
+             // Just return. The callback object was already removed from the map.
+             return;
          }
-         catch (e) {
-             console.log("BitMonster: catched exception while calling callback:");
-             console.log(e);
+         else if (data.type === "success" && cb.success) {
+             utils.callCatch(cb.success, data.data);
+         }
+         else if (data.type === "error" && cb.error) {
+             utils.callCatch(cb.error, data.message);
+         }
+         else {
+             logError();
          }
      });
 

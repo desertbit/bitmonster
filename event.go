@@ -328,6 +328,13 @@ func handleEventRequest(s *Socket, data string) {
 	// Create a new context value.
 	context := newContext(s, m, "")
 
+	// Debug log.
+	log.L.WithFields(logrus.Fields{
+		"remoteAddress": s.RemoteAddr(),
+		"module":        opts.Module,
+		"method":        opts.Event,
+	}).Debugf("bind event")
+
 	// Call the hooks first.
 	for _, hook := range event.hooks {
 		// Trigger the hook.
@@ -337,7 +344,7 @@ func handleEventRequest(s *Socket, data string) {
 				"remoteAddress": s.RemoteAddr(),
 				"module":        opts.Module,
 				"event":         opts.Event,
-			}).Warningf("client request: bind module event: hook error: %v", err)
+			}).Warningf("bind event: hook error %v", err)
 
 			return
 		}
@@ -348,7 +355,7 @@ func handleEventRequest(s *Socket, data string) {
 				"remoteAddress": s.RemoteAddr(),
 				"module":        opts.Module,
 				"event":         opts.Event,
-			}).Warningf("client request: bind module event: hook error: %v", context.err)
+			}).Warningf("bind event: hook error %v", context.err)
 
 			return
 		}

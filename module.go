@@ -18,7 +18,11 @@
 
 package bitmonster
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/desertbit/bitmonster/log"
+)
 
 var (
 	modules = make(map[string]*Module)
@@ -72,52 +76,35 @@ func (m *Module) Name() string {
 // This method is not thread-safe and should be only called during
 // module initialization.
 func (m *Module) AddMethod(name string, method Method, hooks ...Hook) {
-	// Handle errors simple.
-	err := func() error {
-		// Check if the method name already exists.
-		if _, ok := m.methods[name]; ok {
-			return fmt.Errorf("a method with the name is already registered")
-		}
-
-		// Create the method context and set the method and its hooks.
-		mc := newMethodContext(method, hooks)
-
-		// Add it to the methods map.
-		m.methods[name] = mc
-
-		return nil
-	}()
-
-	// Handle the error if present.
-	if err != nil {
-		initError(fmt.Errorf("module '%s': method '%s': %v", m.name, name, err))
-		return
+	// Check if the method name already exists.
+	if _, ok := m.methods[name]; ok {
+		// Log the warning.
+		log.L.Warningf("module '%s': method '%s': a method with the name is already registered", m.name, name)
 	}
+
+	// Create the method context and set the method and its hooks.
+	mc := newMethodContext(method, hooks)
+
+	// Add it to the methods map.
+	m.methods[name] = mc
 }
 
 // AddEvent adds and registers a new event.
-func (m *Module) AddEvent(name string, hooks ...Hook) {
-	// Handle errors simple.
-	err := func() error {
-		// Check if the event name already exists.
-		if _, ok := m.events[name]; ok {
-			return fmt.Errorf("an event with the name is already registered")
-		}
-
-		// Create a new event.
-		event := newEvent(name, hooks)
-
-		// Add it to the events map.
-		m.events[name] = event
-
-		return nil
-	}()
-
-	// Handle the error if present.
-	if err != nil {
-		initError(fmt.Errorf("module '%s': event '%s': %v", m.name, name, err))
-		return
+// The newly created event is returned.
+func (m *Module) AddEvent(name string, hooks ...Hook) *Event {
+	// Check if the event name already exists.
+	if _, ok := m.events[name]; ok {
+		// Log the warning.
+		log.L.Warningf("module '%s': event '%s': an event with the name is already registered", m.name, name)
 	}
+
+	// Create a new event.
+	event := newEvent(name, hooks)
+
+	// Add it to the events map.
+	m.events[name] = event
+
+	return event
 }
 
 // Event returns the event specified by the name.

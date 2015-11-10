@@ -35,11 +35,6 @@ const (
 	dbTableUsersUsernameIndex = "username"
 )
 
-const (
-	// AdminGroup is the administration group.
-	AdminGroup = "admin"
-)
-
 var (
 	ErrNotFound              = errors.New("Not found")
 	ErrUsernameAlreadyExists = errors.New("a user with the username already exists")
@@ -80,6 +75,12 @@ func (u *User) Validate() error {
 		return fmt.Errorf("invalid required user fields: %v", err)
 	} else if !result {
 		return fmt.Errorf("invalid required user fields")
+	}
+
+	// Check if the user groups are valid.
+	valid := validGroups(u.Groups...)
+	if !valid {
+		return fmt.Errorf("invalid user group(s): %v", u.Groups)
 	}
 
 	return nil

@@ -107,8 +107,7 @@ func login(c *bitmonster.Context) error {
 	}
 
 	// Compare the password.
-	err = comparePasswordHash(user.PasswordHash, loginData.Password)
-	if err != nil {
+	if match := user.ComparePasswords(loginData.Password); !match {
 		c.Error("invalid login credentials")
 		return nil
 	}

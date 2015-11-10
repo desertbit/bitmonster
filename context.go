@@ -124,6 +124,7 @@ func (c *Context) Value(key interface{}, f ...func() interface{}) interface{} {
 }
 
 // SetValue sets a custom value with a key.
+// This operation is thread-safe.
 func (c *Context) SetValue(key interface{}, value interface{}) {
 	// Lock the mutex.
 	c.valuesMutex.Lock()
@@ -134,6 +135,7 @@ func (c *Context) SetValue(key interface{}, value interface{}) {
 }
 
 // DeleteValue removes a custom value with a key.
+// This operation is thread-safe.
 func (c *Context) DeleteValue(key interface{}) {
 	// Lock the mutex.
 	c.valuesMutex.Lock()
@@ -144,6 +146,7 @@ func (c *Context) DeleteValue(key interface{}) {
 }
 
 // ClearValues clears all values from the custom values map.
+// This operation is thread-safe.
 func (c *Context) ClearValues() {
 	// Lock the mutex.
 	c.valuesMutex.Lock()

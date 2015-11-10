@@ -1,4 +1,9 @@
+- Implement HTTP cookie authentication addition.
+- Auth: db events, remove user, add user, change password, getters
 - Implement protocol version check.
+
+## General:
+- Add more testing.
 
 ## Security:
 - DDOS prevention.

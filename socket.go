@@ -146,6 +146,7 @@ func (s *Socket) Value(key interface{}, f ...func() interface{}) interface{} {
 }
 
 // SetValue sets a custom value with a key.
+// This operation is thread-safe.
 func (s *Socket) SetValue(key interface{}, value interface{}) {
 	// Lock the mutex.
 	s.valuesMutex.Lock()
@@ -156,6 +157,7 @@ func (s *Socket) SetValue(key interface{}, value interface{}) {
 }
 
 // DeleteValue removes a custom value with a key.
+// This operation is thread-safe.
 func (s *Socket) DeleteValue(key interface{}) {
 	// Lock the mutex.
 	s.valuesMutex.Lock()
@@ -166,6 +168,7 @@ func (s *Socket) DeleteValue(key interface{}) {
 }
 
 // DeleteValueAfterTimeout removes a custom value after the specified timeout.
+// This operation is thread-safe.
 func (s *Socket) DeleteValueAfterTimeout(key interface{}, timeout time.Duration) {
 	time.AfterFunc(timeout, func() {
 		s.DeleteValue(key)

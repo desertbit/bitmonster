@@ -33,6 +33,8 @@ import (
 const (
 	dbTableUsers              = "auth_users"
 	dbTableUsersUsernameIndex = "username"
+
+	minimumPasswordLen = 8
 )
 
 var (
@@ -86,6 +88,61 @@ func (u *User) Validate() error {
 	return nil
 }
 
+// ChangePassword changes a user's password.
+func (u *User) ChangePassword(password string) (err error) {
+	// Prepare the password.
+	if len(password) < minimumPasswordLen {
+		return fmt.Errorf("password is too short: minimum %v characters required", minimumPasswordLen)
+	}
+
+	u.PasswordHash, err = hashPassword(password)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ComparePasswords compares the passed password with the user's password hash.
+// This method is safe against timing attacks.
+func (u *User) ComparePasswords(password string) (match bool) {
+	// Compare the password.
+	err := comparePasswordHash(u.PasswordHash, password)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+// AddGroup adds the user to the passed group(s).
+func (u *User) AddGroup(groups ...string) {
+Loop:
+	for _, g := range groups {
+		// Check if the user is already in the group.
+		for _, ug := range u.Groups {
+			if ug == g {
+				continue Loop
+			}
+		}
+
+		// Add the user to the group.
+		u.Groups = append(u.Groups, g)
+	}
+}
+
+// RemoveGroup removes the user from the group(s).
+func (u *User) RemoveGroup(groups ...string) {
+	for _, g := range groups {
+		// Remove the group. Don't break, to remove possible duplicate groups.
+		for i := len(u.Groups) - 1; i >= 0; i-- {
+			if g == u.Groups[i] {
+				u.Groups = append(u.Groups[:i], u.Groups[i+1:]...)
+			}
+		}
+	}
+}
+
 //##############//
 //### Public ###//
 //##############//
@@ -101,18 +158,14 @@ func NewUser(username, name, email, password string) (*User, error) {
 		Created:  time.Now(),
 	}
 
-	// Validate the struct
-	err := u.Validate()
+	// Set the password.
+	err := u.ChangePassword(password)
 	if err != nil {
 		return nil, err
 	}
 
-	// Prepare the password.
-	if len(password) < 8 {
-		return nil, fmt.Errorf("password is too short: minimum 8 characters")
-	}
-
-	u.PasswordHash, err = hashPassword(password)
+	// Validate the struct
+	err = u.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +246,17 @@ func AddUser(u *User) error {
 	_, err = r.Table(dbTableUsers).Insert(u).RunWrite(db.Session)
 	if err != nil {
 		return fmt.Errorf("failed to insert new user '%s' to database: %v", u.Username, err)
+	}
+
+	return nil
+}
+
+// DeleteUser removes a user from the database.
+func DeleteUser(userID string) error {
+	// Delete the user from the database.
+	_, err := r.Table(dbTableUsers).Get(userID).Delete().RunWrite(db.Session)
+	if err != nil {
+		return fmt.Errorf("failed to delete user '%s' from database: %v", userID, err)
 	}
 
 	return nil

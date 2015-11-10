@@ -38,7 +38,8 @@ const (
 )
 
 var (
-	ErrNotFound              = errors.New("Not found")
+	ErrNotFound              = errors.New("not found")
+	ErrEmptyResult           = errors.New("empty result")
 	ErrUsernameAlreadyExists = errors.New("a user with the username already exists")
 )
 
@@ -54,6 +55,8 @@ type AuthSession struct {
 	Created     time.Time `gorethink:"created"`
 	LastAuth    time.Time `gorethink:"lastAuth"`
 }
+
+type Users []*User
 
 type User struct {
 	ID        string    `gorethink:"id"         json:"id"           valid:"uuidv4,required"`
@@ -272,10 +275,51 @@ func UpdateUser(u *User) error {
 	}
 
 	// Update the user.
-	_, err = r.Table(dbTableUsers).Replace(u).RunWrite(db.Session)
+	_, err = r.Table(dbTableUsers).Get(u.ID).Replace(u).RunWrite(db.Session)
 	if err != nil {
 		return fmt.Errorf("failed to update user '%s' in database: %v", u.Username, err)
 	}
 
 	return nil
+}
+
+// GetUsers obtains all users from the database.
+// Optionally pass groups. If the user is at least in one of the passed groups
+// it is added to the result slice.
+// Returns ErrEmptyResult if no users are found.
+// Don't use this method for setups with a large user database.
+func GetUsers(groups ...string) (Users, error) {
+	// Create the database term.
+	term := r.Table(dbTableUsers)
+
+	// Add the groups filter if present.
+	if len(groups) > 0 {
+		// Transform to interface slice.
+		groupsI := make([]interface{}, len(groups))
+		for i, g := range groups {
+			groupsI[i] = g
+		}
+
+		// Append the filter.
+		term = term.Filter(r.Row.Field("groups").Contains(groupsI...))
+	}
+
+	// Obtain the users.
+	rows, err := term.Run(db.Session)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users: %v", err)
+	}
+
+	var users Users
+	err = rows.All(&users)
+	if err != nil {
+		// Check if nothing was found.
+		if err == r.ErrEmptyResult {
+			return nil, ErrEmptyResult
+		}
+
+		return nil, fmt.Errorf("failed to get users: %v", err)
+	}
+
+	return users, nil
 }

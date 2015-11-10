@@ -29,7 +29,7 @@ import (
 //#################//
 
 const (
-	emitterMaxListeners = 30
+	emitterMaxListeners = 50
 )
 
 //#################//
@@ -52,5 +52,5 @@ func init() {
 }
 
 func recoverEmitter(event interface{}, listener interface{}, err error) {
-	log.L.Error("emitter event: %v: listener: %v: %v", event, listener, err)
+	log.L.Errorf("emitter event: %v: listener: %v: %v", event, listener, err)
 }

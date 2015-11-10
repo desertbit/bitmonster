@@ -1,5 +1,5 @@
 - Implement HTTP cookie authentication addition.
-- Auth: db events, remove user, add user, change password, getters
+- Auth module: events, remove user, add user, change password, getters
 - Implement protocol version check.
 
 ## General:
@@ -12,6 +12,8 @@
 - Combine the gorethink database logging with the BitMonster logging.
 
 ## Authentication
+- Implement E-Mail verification. Also on registration.
+- Add an alternative method to GetUsers, which obtains a partial list of users (batched list).
 - Implemented key rotation (SecureCookie).
 - Rotate authentication tokens on login?
 - Simple DDOS and Bruteforce prevention.

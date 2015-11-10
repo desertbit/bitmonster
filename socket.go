@@ -35,6 +35,7 @@ const (
 
 	emitterOnNewSocket   = "onNewSocket"
 	emitterOnCloseSocket = "onCloseSocket"
+	emitterOnCheck       = "onCheck"
 )
 
 //####################//
@@ -106,6 +107,14 @@ func (s *Socket) OffClose(f OnNewSocketFunc) {
 // as soon as the socket is closed.
 func (s *Socket) ClosedChan() ClosedChan {
 	return ClosedChan(s.socket.ClosedChan())
+}
+
+// Check triggeres an internal check routine.
+// Event hooks of already bound events are rerun.
+// Trigger this, if an important state of the socket session has changed
+// and event hooks should be rerun. (Example: logout)
+func (s *Socket) Check() {
+	s.emitter.Emit(emitterOnCheck)
 }
 
 // Value returns a custom value previously set by the key.

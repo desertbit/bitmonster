@@ -384,7 +384,9 @@ bm.module = (function() {
     };
 
     // Rebind the events on reconnections.
-    socket.on("connected", function() {
+    // Don't use the connected event directly, because the authentication
+    // should be handled first.
+    $(socket).on("connected_and_auth", function() {
         $.each(eventsMap, function(module, moduleEvents) {
             $.each(moduleEvents.events, function(event, eventObj) {
                 // Rebind the event.

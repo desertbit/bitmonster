@@ -16,17 +16,12 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// TODO: Válidation helper function.
-// TODO: show widget if connection lost.
-// TODO: show widget if data will be synchronized as soon as reconnected.
-// TODO: Create a developers html api.
-// TODO: if registered with event object, add possibility to disable it again.
-
 // Include the required libraries directly.
 @@include('../bower_components/glue-socket/client/dist/glue.js')
 
 // Include the polyfills.
 @@include('./polyfills.js')
+
 
 var BitMonster = function(host) {
     // Turn on strict mode.

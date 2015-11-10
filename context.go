@@ -21,6 +21,7 @@ package bitmonster
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 )
 
 //####################//
@@ -30,16 +31,14 @@ import (
 // A Context contains the function call context with the passed parameters
 // and the registered callbacks.
 type Context struct {
-	// A map to hold custom data values.
-	// Commonly used by hooks.
-	Values map[interface{}]interface{}
-
-	// Private:
-	// ########
-
 	socket        *Socket
 	module        *Module
 	paramDataJSON string
+
+	// A map to hold custom data values.
+	// Commonly used by hooks.
+	values      map[interface{}]interface{}
+	valuesMutex sync.Mutex
 
 	data interface{} // Set if the Success method is called.
 	err  error       // Set if the Error method is called.
@@ -50,6 +49,7 @@ func newContext(s *Socket, m *Module, paramDataJSON string) *Context {
 		socket:        s,
 		module:        m,
 		paramDataJSON: paramDataJSON,
+		values:        make(map[interface{}]interface{}),
 	}
 }
 
@@ -94,4 +94,61 @@ func (c *Context) Decode(v interface{}) error {
 	}
 
 	return nil
+}
+
+// Value returns a custom value previously set by the key.
+// Returns nil if it does not exists.
+// One variadic function is called if no value exists for the given key.
+// The return value of this function is the new value for the key.
+// This operation is thread-safe.
+func (c *Context) Value(key interface{}, f ...func() interface{}) interface{} {
+	// Lock the mutex.
+	c.valuesMutex.Lock()
+	defer c.valuesMutex.Unlock()
+
+	// Get the value.
+	v, ok := c.values[key]
+	if !ok {
+		// If no value is found and the create function
+		// is set, then call the function and set the new value.
+		if len(f) > 0 {
+			v := f[0]()
+			c.values[key] = v
+			return v
+		}
+
+		return nil
+	}
+
+	return v
+}
+
+// SetValue sets a custom value with a key.
+func (c *Context) SetValue(key interface{}, value interface{}) {
+	// Lock the mutex.
+	c.valuesMutex.Lock()
+	defer c.valuesMutex.Unlock()
+
+	// Set the value.
+	c.values[key] = value
+}
+
+// DeleteValue removes a custom value with a key.
+func (c *Context) DeleteValue(key interface{}) {
+	// Lock the mutex.
+	c.valuesMutex.Lock()
+	defer c.valuesMutex.Unlock()
+
+	// Remove the value.
+	delete(c.values, key)
+}
+
+// ClearValues clears all values from the custom values map.
+func (c *Context) ClearValues() {
+	// Lock the mutex.
+	c.valuesMutex.Lock()
+	defer c.valuesMutex.Unlock()
+
+	// Clear the complete map.
+	c.values = make(map[interface{}]interface{})
 }

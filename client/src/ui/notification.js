@@ -119,7 +119,7 @@ bm.notification = function (options) {
         if (duration > 0) {
             timeout = setTimeout(function() {
                 timeout = false;
-                instance.hide();
+                hide();
             }, duration);
         }
     }

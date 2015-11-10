@@ -22,6 +22,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/desertbit/bitmonster"
 	"github.com/desertbit/bitmonster/settings"
@@ -70,7 +71,7 @@ func main() {
 	m.AddMethod("get", getUsers, auth.MustAdminGroup())
 
 	// Add events.
-	e := m.AddEvent("onNew")
+	e := m.AddEvent("onNew", auth.MustAdminGroup())
 
 	//######
 	// OR get the event.
@@ -81,17 +82,16 @@ func main() {
 
 	_ = e
 
-	/*
-		go func() {
-			for {
-				time.Sleep(time.Second)
-				// Trigger the event.
-				err = e.Trigger()
-				if err != nil {
-					bitmonster.Fatal(err)
-				}
+	go func() {
+		for {
+			time.Sleep(2 * time.Second)
+			// Trigger the event.
+			err = e.Trigger()
+			if err != nil {
+				bitmonster.Fatal(err)
 			}
-		}()*/
+		}
+	}()
 	//#####
 
 	// Start the BitMonster server.

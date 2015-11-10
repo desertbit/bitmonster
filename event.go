@@ -335,30 +335,35 @@ func handleEventRequest(s *Socket, data string) {
 		"method":        opts.Event,
 	}).Debugf("bind event")
 
-	// Call the hooks first.
-	for _, hook := range event.hooks {
-		// Trigger the hook.
-		err = hook.Hook(context)
-		if err != nil {
-			log.L.WithFields(logrus.Fields{
-				"remoteAddress": s.RemoteAddr(),
-				"module":        opts.Module,
-				"event":         opts.Event,
-			}).Warningf("bind event: hook error %v", err)
+	// Run hooks function.
+	runHooks := func() error {
+		// Clear all custom context values before running the hooks.
+		// This is important if the hooks are runned again and cached values are out-of-date.
+		context.ClearValues()
 
-			return
+		for _, hook := range event.hooks {
+			// Trigger the hook.
+			err = hook.Hook(context)
+			if err != nil {
+				return err
+			}
+			// Check if an error was set by the hook function.
+			if context.HasError() {
+				return context.err
+			}
 		}
+		return nil
+	}
 
-		// Trigger the error callback on the client-side if an error was set by the hook function.
-		if context.HasError() {
-			log.L.WithFields(logrus.Fields{
-				"remoteAddress": s.RemoteAddr(),
-				"module":        opts.Module,
-				"event":         opts.Event,
-			}).Warningf("bind event: hook error %v", context.err)
-
-			return
-		}
+	// Run the hooks first.
+	err = runHooks()
+	if err != nil {
+		log.L.WithFields(logrus.Fields{
+			"remoteAddress": s.RemoteAddr(),
+			"module":        opts.Module,
+			"event":         opts.Event,
+		}).Warningf("bind event: hook error: %v", err)
+		return
 	}
 
 	// Create a new event listener.
@@ -370,18 +375,46 @@ func handleEventRequest(s *Socket, data string) {
 	// Start a new goroutine to handle event trigger requests.
 	// Also handle closed sockets.
 	go func() {
+		// Write to the check channel if a check request is triggered.
+		checkChan := make(chan struct{}, 1)
+		onCheckF := func() {
+			checkChan <- struct{}{}
+		}
+		s.emitter.On(emitterOnCheck, onCheckF)
+		defer s.emitter.Off(emitterOnCheck, onCheckF)
+
+	Loop:
 		for {
 			select {
 			case <-l.closedChan:
-				// Just exit this goroutine.
+				// Just release this goroutine.
 				return
 
 			case <-s.ClosedChan():
+				// Remove the listener and release this goroutine.
 				event.removeListener(key)
 				return
 
 			case eventData := <-l.triggerChan:
 				triggerEventCallback(s, &opts, eventData)
+
+			case <-checkChan:
+				// Rerun the hooks.
+				err := runHooks()
+				if err == nil {
+					continue Loop
+				}
+
+				// Log.
+				log.L.WithFields(logrus.Fields{
+					"remoteAddress": s.RemoteAddr(),
+					"module":        opts.Module,
+					"event":         opts.Event,
+				}).Debugf("unbind event after check: hook error: %v", err)
+
+				// Remove the listener and release this goroutine.
+				event.removeListener(key)
+				return
 			}
 		}
 	}()

@@ -35,7 +35,28 @@ bm.auth = (function() {
 
     // Get the authentication module.
     var module      = bm.module("auth"),
-        fingerprint = false;
+        fingerprint = false,
+        authUserID  = false;
+
+
+    /*
+     * The actual authentication object.
+     */
+    var instance = {
+        login:         login,
+        logout:        logout,
+        getUserID:     getUserID,
+        isAuth:        isAuth,
+
+        // Triggered if the session is authenticated (After a successful login).
+        onAuth: function(f) {
+            $(instance).on('onAuth', f);
+        },
+        // Triggered if the authentication state changes (Logged in or out):
+        onAuthChanged: function(f) {
+            $(instance).on('authChanged', f);
+        }
+    };
 
 
 
@@ -43,16 +64,16 @@ bm.auth = (function() {
      * Private Methods
      */
 
-    var getFingerprint = function() {
+    function getFingerprint() {
         if (!fingerprint) {
             // Obtain the browser fingerprint.
             fingerprint = utils.browserFingerprint();
         }
 
         return fingerprint;
-    };
+    }
 
-    var getAuthToken = function() {
+    function getAuthToken() {
         var token;
 
         // Obtain the auth token if present.
@@ -69,9 +90,9 @@ bm.auth = (function() {
         }
 
         return token;
-    };
+    }
 
-    var setAuthToken = function(token) {
+    function setAuthToken(token) {
         // Check if the local storage is available.
         if (utils.storageAvailable('localStorage')) {
             // Save the token in the local storage.
@@ -81,9 +102,9 @@ bm.auth = (function() {
             // Use a cookie as storage alternative.
             utils.cookies.setItem(authTokenID, token, (1*60*60*24*30));
         }
-    };
+    }
 
-    var deleteAuthToken = function() {
+    function deleteAuthToken() {
         // Check if the local storage is available.
         if (utils.storageAvailable('localStorage')) {
             // Remove the token from the local storage.
@@ -93,10 +114,10 @@ bm.auth = (function() {
             // Use a cookie as storage alternative.
             utils.cookies.removeItem(authTokenID);
         }
-    };
+    }
 
     // authenticate this client with the saved auth data.
-    var authenticate = function(callback, errorCallback) {
+    function authenticate(callback, errorCallback) {
         // Get the auth token.
         var authToken = getAuthToken();
         if (!authToken) {
@@ -104,6 +125,9 @@ bm.auth = (function() {
         }
 
         var callErrorCallback = function(err) {
+            // Reset the current authenticated user.
+            setCurrentUserID(false);
+
             if (errorCallback) {
                 utils.callCatch(errorCallback, err);
             }
@@ -116,8 +140,15 @@ bm.auth = (function() {
         };
 
         module.call("authenticate", data, function(data) {
-            // TODO
-            console.log(data);
+            // Validate, that a correct user is returned.
+            if (!data.id) {
+                callErrorCallback("invalid user data received");
+                logout();
+                return;
+            }
+
+            // Set the current authenticated user.
+            setCurrentUserID(data.id);
 
             // Call the success callback.
             if (callback) {
@@ -128,9 +159,9 @@ bm.auth = (function() {
         });
 
         return true;
-    };
+    }
 
-    var login = function(username, password, callback, errorCallback) {
+    function login(username, password, callback, errorCallback) {
         var callErrorCallback = function(err) {
             if (errorCallback) {
                 utils.callCatch(errorCallback, err);
@@ -164,21 +195,56 @@ bm.auth = (function() {
         }, function(err) {
             callErrorCallback(err);
         });
-    };
+    }
 
-    var logout = function() {
+    function logout() {
+        // Reset the current authenticated user.
+        setCurrentUserID(false);
+
         // Remove the authentication token.
         deleteAuthToken();
 
         // Logout on server-side.
         module.call("logout", function() {
-            console.log("logout success");
             // Logout successful on server-side.
         }, function(err) {
-            console.log("failed to logout socket session");
+            console.log("BitMonster: failed to logout socket session");
             if (err) { console.log(err); }
         });
-    };
+    }
+
+    function setCurrentUserID(userID) {
+        // Skip if nothing has changed.
+        // This will prevent triggering the events multiple times.
+        if (authUserID === userID) {
+            return;
+        }
+
+        // Set the new user ID.
+        authUserID = userID;
+
+        // Trigger the events.
+        $(instance).trigger('authChanged');
+
+        if (authUserID) {
+            $(instance).trigger('onAuth');
+        }
+    }
+
+    // Returns false if not logged in.
+    function getUserID() {
+        if (!authUserID) {
+            return false;
+        }
+        return authUserID;
+    }
+
+    function isAuth() {
+        if (!authUserID) {
+            return false;
+        }
+        return true;
+    }
 
 
 
@@ -189,26 +255,49 @@ bm.auth = (function() {
     // Authenticate as soon as the socket connects.
     socket.on("connected", function() {
         // Authenticate this socket session if the authToken is present.
-        authenticate(undefined, function(err) {
-            // TODO: Add graphical notification.
-            console.log("failed to authenticate: " + err);
+        var notAuth = authenticate(function() {
+            // Trigger the custom event.
+            $(socket).trigger("connected_and_auth");
+        }, function(err) {
+            // Trigger the custom event.
+            $(socket).trigger("connected_and_auth");
+
+            // Log.
+            console.log("BitMonster: failed to authenticate");
+            if (err) { console.log("error message: " + err); }
+
+            // Show a notification.
+            bm.notification({
+                title: tr.auth.FailedTitle,
+                text: tr.auth.FailedText,
+            }).show(10000);
         });
 
-
-        // TODO: first then reconnect the events!
+        // Trigger the custom event if no authentication was done.
+        if (!notAuth) {
+            $(socket).trigger("connected_and_auth");
+        }
     });
 
-    /*login("foo", "asdfghjkl", function() {
-        console.log("login success!");
-    }, function(err) {
-        console.log("failed to login: " + err);
-    });*/
+    // Authenticate if the event is triggered.
+    module.on("reauthenticate", function() {
+        authenticate(undefined, function(err) {
+            // Log.
+            console.log("BitMonster: failed to reauthenticate");
+            if (err) { console.log("error message: " + err); }
+
+            // Show a notification.
+            bm.notification({
+                title: tr.auth.FailedTitle,
+                text: tr.auth.FailedText,
+            }).show(10000);
+        });
+    });
+
+
 
      /*
-      * Return the actual authentication object.
+      * Return the authentication object.
       */
-     return {
-         login:     login,
-         logout:    logout
-     };
+     return instance;
 })();

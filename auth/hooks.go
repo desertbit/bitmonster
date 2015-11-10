@@ -19,6 +19,8 @@
 package auth
 
 import (
+	"fmt"
+
 	"github.com/desertbit/bitmonster"
 )
 
@@ -55,6 +57,10 @@ type hook struct {
 }
 
 func (h *hook) Hook(c *bitmonster.Context) error {
+	// TODO
+	if !IsAuth(c.Socket()) {
+		return fmt.Errorf("not auth!")
+	}
 
 	return nil
 }

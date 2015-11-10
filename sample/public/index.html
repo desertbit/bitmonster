@@ -12,11 +12,26 @@
 
 	<script>
 		var bm = BitMonster();
-/*
+
+		bm.auth.onAuthChanged(function() {
+			console.log("is Auth: " + bm.auth.isAuth());
+		})
+
+		/*bm.auth.login("foo", "asdfghjkl", function() {
+			console.log("login success!");
+		}, function(err) {
+			console.log("failed to login: " + err);
+		});*/
+
 		// Get the users module.
 		var users = bm.module("users");
 
+		var e = users.on("onNew", function(data) {
+			console.log("onNew triggered");
+			console.log(data);
+		});
 
+/*
 		users.call("get", {
 			name:   "Sample",
 			foo:    "bar"

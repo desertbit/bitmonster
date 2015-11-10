@@ -20,10 +20,13 @@ package auth
 
 import (
 	"fmt"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/desertbit/bitmonster"
+	"github.com/desertbit/bitmonster/log"
 )
 
 //#################//
@@ -32,6 +35,9 @@ import (
 
 const (
 	authSocketValueKey = "auth"
+
+	checkAuthInterval = time.Minute
+	reauthTimeout     = 15 * time.Second
 )
 
 //#####################//
@@ -42,6 +48,7 @@ type authSocketValue struct {
 	isAuth         bool
 	authSessionKey string
 	userID         string
+	reauthTimer    *time.Timer
 }
 
 func newAuthSocketValue() *authSocketValue {
@@ -63,8 +70,8 @@ func IsAuth(s *bitmonster.Socket) bool {
 	return av.isAuth
 }
 
-// AuthUser returns the authenticated user of the socket or nil.
-func AuthUser(s *bitmonster.Socket) (*User, error) {
+// CurrentUser returns the current authenticated user of the socket session or nil.
+func CurrentUser(s *bitmonster.Socket) (*User, error) {
 	// Get the current socket value.
 	av := getAuthSocketValue(s)
 	if av == nil {
@@ -88,6 +95,30 @@ func AuthUser(s *bitmonster.Socket) (*User, error) {
 //### Private ###//
 //###############//
 
+func init() {
+	// Bind the event.
+	bitmonster.OnNewSocket(onNewSocket)
+}
+
+func onNewSocket(s *bitmonster.Socket) {
+	// Start a goroutine to check the authentication state in an interval.
+	go func() {
+		ticker := time.NewTicker(checkAuthInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-s.ClosedChan():
+				// Just release this goroutine.
+				return
+
+			case <-ticker.C:
+				checkSocketAuthentication(s)
+			}
+		}
+	}()
+}
+
 // getAuthSocketValue obtains the authentication socket value from the socket.
 // If not present, then this function creates the value.
 func getAuthSocketValue(s *bitmonster.Socket) *authSocketValue {
@@ -106,6 +137,31 @@ func getAuthSocketValue(s *bitmonster.Socket) *authSocketValue {
 	return av
 }
 
+// resetAuthSocketValue removes the socket authentication values and triggers
+// the socket Check method.
+func resetAuthSocketValue(s *bitmonster.Socket) {
+	// Debug log.
+	log.L.WithFields(logrus.Fields{
+		"remoteAddress": s.RemoteAddr(),
+	}).Debugf("auth: authentication state resetted")
+
+	// Get the auth socket value.
+	av := getAuthSocketValue(s)
+	if av != nil {
+		// Stop the reauth timer if present.
+		if av.reauthTimer != nil {
+			av.reauthTimer.Stop()
+		}
+	}
+
+	// Remove the socket auth value to delete the authenticated infos.
+	s.DeleteValue(authSocketValueKey)
+
+	// Rerun the event hooks.
+	// This will unbind events which require authentication.
+	s.Check()
+}
+
 func hashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -120,119 +176,43 @@ func comparePasswordHash(hashedPassword, password string) error {
 	return err
 }
 
+func checkSocketAuthentication(s *bitmonster.Socket) {
+	// Get the auth socket value.
+	av := getAuthSocketValue(s)
+	if av == nil {
+		return
+	}
+
+	// Skip if not authenticated.
+	if !av.isAuth {
+		return
+	}
+
+	// Debug log.
+	log.L.WithFields(logrus.Fields{
+		"remoteAddress": s.RemoteAddr(),
+	}).Debugf("auth: reauthentication requested")
+
+	// Trigger the event to reauthenticate.
+	eventReauth.TriggerSocket(s)
+
+	// Start a timeout to logout the socket session.
+	av.reauthTimer = time.AfterFunc(reauthTimeout, func() {
+		// Reset the socket authentication values.
+		resetAuthSocketValue(s)
+	})
+}
+
 // TODO//#####################################################################################
 /*
 const (
 	httpHandleURL = "/bitmonster/auth"
-
-	authRequestTimeout   = 10 * time.Second
-	authRequestKeyLength = 30
 )
 
-var (
-	authRequestMap      = make(map[string]*authRequest)
-	authRequestMapMutex sync.Mutex
-)
-
-//#####################//
-//### Private Types ###//
-//#####################//
-
-type authRequest struct {
-	socketID        string
-	stopTimeoutChan chan struct{}
-}
-
-//###############//
-//### Private ###//
-//###############//
 
 func init() {
 	// Register the HTTP handler.
 	http.HandleFunc(httpHandleURL, handleAuthRequest)
-}
-
-// newAuthRequest creates a new authentication request and returns the access key.
-func newAuthRequest(s *bitmonster.Socket) (key string) {
-	ar := &authRequest{
-		socketID:        s.ID(),
-		stopTimeoutChan: make(chan struct{}),
-	}
-
-	func() {
-		// Lock the mutex.
-		authRequestMapMutex.Lock()
-		defer authRequestMapMutex.Unlock()
-
-		// Create a unique key.
-		key = utils.RandomString(authRequestKeyLength)
-		for {
-			if _, ok := authRequestMap[key]; !ok {
-				break
-			}
-			key = utils.RandomString(authRequestKeyLength)
-		}
-
-		// Add to map.
-		authRequestMap[key] = ar
-	}()
-
-	// Start the timeout goroutine.
-	go func() {
-		// Create a timeout timer.
-		timeout := time.NewTimer(authRequestTimeout)
-		defer timeout.Stop()
-
-		// Wait for it.
-		select {
-		case <-ar.stopTimeoutChan:
-			// Just release this goroutine.
-			return
-
-		case <-timeout.C:
-			// Lock the mutex.
-			authRequestMapMutex.Lock()
-			defer authRequestMapMutex.Unlock()
-
-			// Remove again from map.
-			delete(authRequestMap, key)
-		}
-	}()
-
-	return key
-}
-
-// getAuthRequestSocket obtains the socket specified by the access key.
-// Returns nil if not found.
-func getAuthRequestSocket(key string) *bitmonster.Socket {
-	socketID := func() string {
-		// Lock the mutex.
-		authRequestMapMutex.Lock()
-		defer authRequestMapMutex.Unlock()
-
-		// Obtain the socket ID.
-		ar, ok := authRequestMap[key]
-		if !ok {
-			return ""
-		}
-
-		// Stop the timeout.
-		close(ar.stopTimeoutChan)
-
-		// Remove again from map.
-		delete(authRequestMap, key)
-
-		return ar.socketID
-	}()
-
-	if len(socketID) == 0 {
-		return nil
-	}
-
-	// Obtain the socket with its ID.
-	s := bitmonster.GetSocket(socketID)
-
-	return s
 }
 
 func handleAuthRequest(rw http.ResponseWriter, req *http.Request) {

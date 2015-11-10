@@ -24,5 +24,9 @@
 		DiscardNotSendDataText: "Not all data messages could be transmitted to the server!",
 		DisconnectedTitle: "Disconnected from Server",
 		DisconnectedText: "Click here to reconnect.",
+	},
+	auth: {
+		FailedTitle: "Authentication failed",
+		FailedText:  "Failed to authenticate this session."
 	}
 }

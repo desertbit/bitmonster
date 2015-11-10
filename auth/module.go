@@ -42,7 +42,9 @@ const (
 )
 
 var (
-	module            *bitmonster.Module
+	module      *bitmonster.Module
+	eventReauth *bitmonster.Event
+
 	authSessionMaxAge time.Duration
 )
 
@@ -62,6 +64,9 @@ func init() {
 	// Create the authentication module.
 	module, err = bitmonster.NewModule(ModuleName)
 	bitmonster.Fatal(err)
+
+	// Add events.
+	eventReauth = module.AddEvent("reauthenticate")
 
 	// Add module methods.
 	module.AddMethod("login", login)
@@ -181,13 +186,11 @@ func login(c *bitmonster.Context) error {
 }
 
 func logout(c *bitmonster.Context) error {
-	// TODO: Rerun event hooks!
-
-	// Get the socket pointer.
+	// Get the socket.
 	s := c.Socket()
 
 	// Get the current authenticated user.
-	user, err := AuthUser(s)
+	user, err := CurrentUser(s)
 	if err != nil {
 		return err
 	}
@@ -198,7 +201,7 @@ func logout(c *bitmonster.Context) error {
 
 	// Debug log.
 	log.L.WithFields(logrus.Fields{
-		"remoteAddress": c.Socket().RemoteAddr(),
+		"remoteAddress": s.RemoteAddr(),
 		"user":          user.Username,
 		"userID":        user.ID,
 	}).Debugf("auth: logout")
@@ -209,8 +212,8 @@ func logout(c *bitmonster.Context) error {
 		return fmt.Errorf("failed to obtain auth socket value")
 	}
 
-	// Remove the socket auth value to delete the authenticated infos.
-	s.DeleteValue(authSocketValueKey)
+	// Reset the socket authentication values.
+	resetAuthSocketValue(s)
 
 	// Remove the authenticated session specified by the key.
 	if user.AuthSessions != nil {
@@ -226,14 +229,27 @@ func logout(c *bitmonster.Context) error {
 	return nil
 }
 
-func authenticate(c *bitmonster.Context) error {
+func authenticate(c *bitmonster.Context) (err error) {
+	// Get the socket.
+	s := c.Socket()
+
+	// Reset the session authentication values if an error occurs.
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		// Reset the socket authentication values.
+		resetAuthSocketValue(s)
+	}()
+
 	// Obtain the authentication data from the context.
 	authData := struct {
 		Token       string `json:"token"`
 		Fingerprint string `json:"fingerprint"`
 	}{}
 
-	err := c.Decode(&authData)
+	err = c.Decode(&authData)
 	if err != nil {
 		return err
 	}
@@ -256,7 +272,7 @@ func authenticate(c *bitmonster.Context) error {
 
 	// Debug log.
 	log.L.WithFields(logrus.Fields{
-		"remoteAddress": c.Socket().RemoteAddr(),
+		"remoteAddress": s.RemoteAddr(),
 		"user":          user.Username,
 		"userID":        user.ID,
 	}).Debugf("auth: authentication request")
@@ -303,13 +319,15 @@ func authenticate(c *bitmonster.Context) error {
 		return err
 	}
 
-	// Get the socket.
-	s := c.Socket()
-
 	// Get or create the auth socket value.
 	av := getAuthSocketValue(s)
 	if av == nil {
 		return fmt.Errorf("failed to create auth socket value for socket")
+	}
+
+	// Stop the logout timer if present.
+	if av.reauthTimer != nil {
+		av.reauthTimer.Stop()
 	}
 
 	// Update the auth socket value.
@@ -322,7 +340,7 @@ func authenticate(c *bitmonster.Context) error {
 
 	// Debug log.
 	log.L.WithFields(logrus.Fields{
-		"remoteAddress": c.Socket().RemoteAddr(),
+		"remoteAddress": s.RemoteAddr(),
 		"user":          user.Username,
 		"userID":        user.ID,
 	}).Debugf("auth: authentication success")

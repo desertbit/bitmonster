@@ -71,15 +71,30 @@ func IsAuth(s *bitmonster.Socket) bool {
 }
 
 // CurrentUser returns the current authenticated user of the socket session or nil.
-func CurrentUser(s *bitmonster.Socket) (*User, error) {
+// Optionally pass one variadic boolean to enable caching.
+// If caching is enabled, multiple calls to this method will return the cached user value
+// instead of always obtaining the value from the database.
+// Note: The cached value might be out-of-date.
+// Don't enable the cache if the returned user value is used to be written to the database.
+func CurrentUser(s *bitmonster.Socket, enableCache ...bool) (*User, error) {
 	// Get the current socket value.
 	av := getAuthSocketValue(s)
 	if av == nil {
 		return nil, fmt.Errorf("failed to obtain auth socket value")
 	}
 
+	// Check if authenticated.
 	if !av.isAuth {
 		return nil, nil
+	}
+
+	if len(enableCache) > 0 && enableCache[0] {
+		// Try to obtain the current user from the cache.
+		user := getCachedCurrentUser(s)
+		if user != nil {
+			// Return the cached value.
+			return user, nil
+		}
 	}
 
 	// Obtain the user by the ID.
@@ -87,6 +102,9 @@ func CurrentUser(s *bitmonster.Socket) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Set the user to the cache.
+	setCachedCurrentUser(s, user)
 
 	return user, nil
 }
@@ -156,6 +174,9 @@ func resetAuthSocketValue(s *bitmonster.Socket) {
 
 	// Remove the socket auth value to delete the authenticated infos.
 	s.DeleteValue(authSocketValueKey)
+
+	// Clear the cache.
+	clearCache(s)
 
 	// Rerun the event hooks.
 	// This will unbind events which require authentication.

@@ -26,20 +26,17 @@ import (
 
 var (
 	mustGroupAdminHook = MustGroup(AdminGroup)
+	mustIsAuth         = new(isAuthHook)
 )
 
 //##############//
 //### Public ###//
 //##############//
 
-// MustGroup returns a BitMonster Hook which requires an authenticated
-// user who is member of one of the passed groups.
-func MustGroup(groups ...string) bitmonster.Hook {
-	h := &hook{
-		groups: groups,
-	}
-
-	return h
+// MustIsAuth returns a BitMonster Hook which requires an authenticated
+// user session.
+func MustIsAuth() bitmonster.Hook {
+	return mustIsAuth
 }
 
 // MustAdminGroup returns a BitMonster Hook which requires an authenticated
@@ -48,18 +45,54 @@ func MustAdminGroup() bitmonster.Hook {
 	return mustGroupAdminHook
 }
 
+// MustGroup returns a BitMonster Hook which requires an authenticated
+// user who is member of one of the passed groups.
+func MustGroup(groups ...string) bitmonster.Hook {
+	h := &groupHook{
+		groups: groups,
+	}
+
+	return h
+}
+
 //######################//
 //### Private - Hook ###//
 //######################//
 
-type hook struct {
+type groupHook struct {
 	groups []string
 }
 
-func (h *hook) Hook(c *bitmonster.Context) error {
-	// TODO
+func (h *groupHook) Hook(c *bitmonster.Context) error {
+	// Obtain the current user.
+	// Enable the cache. This hook might be called many times...
+	user, err := CurrentUser(c.Socket(), true)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return fmt.Errorf("socket session is not authenticated")
+	}
+
+	// Check if the user is in one of the groups.
+	for _, g := range h.groups {
+		for _, ug := range user.Groups {
+			if g == ug {
+				// Return because the user is at least in one group.
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("socket session is not authenticated: not member of required group(s)")
+}
+
+type isAuthHook struct {
+}
+
+func (h *isAuthHook) Hook(c *bitmonster.Context) error {
 	if !IsAuth(c.Socket()) {
-		return fmt.Errorf("not auth!")
+		return fmt.Errorf("socket session is not authenticated")
 	}
 
 	return nil

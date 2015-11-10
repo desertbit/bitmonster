@@ -72,7 +72,9 @@ func init() {
 	module.AddMethod("login", login)
 	module.AddMethod("logout", logout)
 	module.AddMethod("authenticate", authenticate)
-	module.AddMethod("getUser", getUser)
+
+	// Module methods which require admin rights.
+	module.AddMethod("getUser", getUser, MustAdminGroup())
 }
 
 //################################//
@@ -334,6 +336,9 @@ func authenticate(c *bitmonster.Context) (err error) {
 	av.isAuth = true
 	av.authSessionKey = key
 	av.userID = user.ID
+
+	// Clear the cache.
+	clearCache(s)
 
 	// Set the current logged in user as return data.
 	c.Data(user)

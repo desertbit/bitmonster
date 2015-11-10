@@ -20,6 +20,7 @@ package bitmonster
 
 import (
 	"sync"
+	"time"
 
 	"github.com/chuckpreslar/emission"
 	"github.com/desertbit/glue"
@@ -162,6 +163,13 @@ func (s *Socket) DeleteValue(key interface{}) {
 
 	// Remove the value.
 	delete(s.values, key)
+}
+
+// DeleteValueAfterTimeout removes a custom value after the specified timeout.
+func (s *Socket) DeleteValueAfterTimeout(key interface{}, timeout time.Duration) {
+	time.AfterFunc(timeout, func() {
+		s.DeleteValue(key)
+	})
 }
 
 //##############//

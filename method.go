@@ -20,6 +20,7 @@ package bitmonster
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/desertbit/bitmonster/log"
 	"github.com/desertbit/bitmonster/utils"
@@ -233,6 +234,11 @@ func triggerSuccessCallback(s *Socket, opts *callOpts, methodData interface{}) {
 // Instead errors are logged.
 // Optional pass the real error.
 func triggerErrorCallback(s *Socket, opts *callOpts, cbErr error, realErr ...error) {
+	// Set the default callback error message if not set.
+	if cbErr == nil {
+		cbErr = fmt.Errorf("method call failed")
+	}
+
 	// Log.
 	if len(realErr) > 0 {
 		log.L.WithFields(logrus.Fields{

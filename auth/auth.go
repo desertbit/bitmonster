@@ -19,6 +19,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -38,6 +39,14 @@ const (
 
 	checkAuthInterval = time.Minute
 	reauthTimeout     = 15 * time.Second
+)
+
+//#################//
+//### Variables ###//
+//#################//
+
+var (
+	ErrNotAuth = errors.New("not authenticated")
 )
 
 //#####################//
@@ -70,7 +79,8 @@ func IsAuth(s *bitmonster.Socket) bool {
 	return av.isAuth
 }
 
-// CurrentUser returns the current authenticated user of the socket session or nil.
+// CurrentUser returns the current authenticated user of the socket session.
+// If the socket session is not authenticated, then ErrNotAuth is returned.
 // Optionally pass one variadic boolean to enable caching.
 // If caching is enabled, multiple calls to this method will return the cached user value
 // instead of always obtaining the value from the database.
@@ -85,7 +95,7 @@ func CurrentUser(s *bitmonster.Socket, enableCache ...bool) (*User, error) {
 
 	// Check if authenticated.
 	if !av.isAuth {
-		return nil, nil
+		return nil, ErrNotAuth
 	}
 
 	if len(enableCache) > 0 && enableCache[0] {

@@ -75,6 +75,7 @@ func init() {
 
 	// Module methods which require admin rights.
 	module.AddMethod("getUser", getUser, MustAdminGroup())
+	module.AddMethod("getUsers", getUsers, MustAdminGroup())
 }
 
 //################################//
@@ -193,11 +194,11 @@ func logout(c *bitmonster.Context) error {
 	// Get the current authenticated user.
 	user, err := CurrentUser(s)
 	if err != nil {
+		if err == ErrNotAuth {
+			// Not authenticated.
+			return nil
+		}
 		return err
-	}
-	if user == nil {
-		// Not authenticated.
-		return nil
 	}
 
 	// Debug log.
@@ -353,6 +354,61 @@ func authenticate(c *bitmonster.Context) (err error) {
 }
 
 func getUser(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		ID       string `json:"id"`
+		Username string `json:"username"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Obtain the user.
+	var user *User
+
+	if len(data.ID) > 0 {
+		user, err = GetUser(data.ID)
+		if err != nil {
+			return err
+		}
+	} else if len(data.Username) > 0 {
+		user, err = GetUserByUsername(data.Username)
+		if err != nil {
+			return err
+		}
+	} else {
+		c.Error("invalid method data passed")
+		return nil
+	}
+
+	// Set the user as return data.
+	c.Data(user)
+
+	return nil
+}
+
+func getUsers(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		Groups []string `json:"groups"`
+	}{}
+
+	err := c.Decode(&data)
+	// Skip if no context data is available.
+	if err != nil && err != bitmonster.ErrNoContextData {
+		return err
+	}
+
+	// Obtain the users.
+	users, err := GetUsers(data.Groups...)
+	if err != nil {
+		return err
+	}
+
+	// Set the users as return data.
+	c.Data(users)
 
 	return nil
 }

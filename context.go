@@ -20,8 +20,13 @@ package bitmonster
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
+)
+
+var (
+	ErrNoContextData = errors.New("no context data available to decode")
 )
 
 //####################//
@@ -81,10 +86,11 @@ func (c *Context) HasError() bool {
 
 // Decode the context data to a custom value.
 // The value has to be passed as pointer.
+// Returns ErrNoContextData if there is no context data available to decode.
 func (c *Context) Decode(v interface{}) error {
 	// Check if the data JSON string is empty.
 	if len(c.paramDataJSON) == 0 {
-		return fmt.Errorf("no context data available to decode")
+		return ErrNoContextData
 	}
 
 	// Unmarshal the data JSON.

@@ -1,6 +1,5 @@
 - Implement HTTP cookie authentication addition.
-- Auth module: events, remove user, add user, change password, getters
-getUser in module.
+- Auth module: remove user, add user, change password
 - Implement protocol version check.
 
 ## General:

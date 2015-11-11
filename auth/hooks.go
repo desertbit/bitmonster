@@ -70,9 +70,6 @@ func (h *groupHook) Hook(c *bitmonster.Context) error {
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return fmt.Errorf("socket session is not authenticated")
-	}
 
 	// Check if the user is in one of the groups.
 	for _, g := range h.groups {

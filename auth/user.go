@@ -31,9 +31,6 @@ import (
 )
 
 const (
-	dbTableUsers              = "auth_users"
-	dbTableUsersUsernameIndex = "username"
-
 	minimumPasswordLen = 8
 )
 
@@ -183,7 +180,7 @@ func GetUserByUsername(username string) (*User, error) {
 		return nil, fmt.Errorf("failed to get user: username is empty")
 	}
 
-	rows, err := r.Table(dbTableUsers).GetAllByIndex(dbTableUsersUsernameIndex, username).Run(db.Session)
+	rows, err := r.Table(DBTableUsers).GetAllByIndex(DBTableUsersUsernameIndex, username).Run(db.Session)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by username '%s': %v", username, err)
 	}
@@ -209,7 +206,7 @@ func GetUser(id string) (*User, error) {
 		return nil, fmt.Errorf("failed to get user: ID is empty")
 	}
 
-	rows, err := r.Table(dbTableUsers).Get(id).Run(db.Session)
+	rows, err := r.Table(DBTableUsers).Get(id).Run(db.Session)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user by ID '%s': %v", id, err)
 	}
@@ -246,21 +243,27 @@ func AddUser(u *User) error {
 	}
 
 	// Insert the user to the database.
-	_, err = r.Table(dbTableUsers).Insert(u).RunWrite(db.Session)
+	_, err = r.Table(DBTableUsers).Insert(u).RunWrite(db.Session)
 	if err != nil {
-		return fmt.Errorf("failed to insert new user '%s' to database: %v", u.Username, err)
+		return fmt.Errorf("failed to insert new user '%s' to database: id '%s': %v", u.Username, u.ID, err)
 	}
+
+	// Trigger the event.
+	emitter.Emit(emitterOnNewUser, u)
 
 	return nil
 }
 
 // DeleteUser removes a user from the database.
-func DeleteUser(userID string) error {
+func DeleteUser(u *User) error {
 	// Delete the user from the database.
-	_, err := r.Table(dbTableUsers).Get(userID).Delete().RunWrite(db.Session)
+	_, err := r.Table(DBTableUsers).Get(u.ID).Delete().RunWrite(db.Session)
 	if err != nil {
-		return fmt.Errorf("failed to delete user '%s' from database: %v", userID, err)
+		return fmt.Errorf("failed to delete user '%s' from database: id '%s': %v", u.Username, u.ID, err)
 	}
+
+	// Trigger the event.
+	emitter.Emit(emitterOnDeleteUser, u)
 
 	return nil
 }
@@ -275,7 +278,7 @@ func UpdateUser(u *User) error {
 	}
 
 	// Update the user.
-	_, err = r.Table(dbTableUsers).Get(u.ID).Replace(u).RunWrite(db.Session)
+	_, err = r.Table(DBTableUsers).Get(u.ID).Replace(u).RunWrite(db.Session)
 	if err != nil {
 		return fmt.Errorf("failed to update user '%s' in database: %v", u.Username, err)
 	}
@@ -290,7 +293,7 @@ func UpdateUser(u *User) error {
 // Don't use this method for setups with a large user database.
 func GetUsers(groups ...string) (Users, error) {
 	// Create the database term.
-	term := r.Table(dbTableUsers)
+	term := r.Table(DBTableUsers)
 
 	// Add the groups filter if present.
 	if len(groups) > 0 {

@@ -24,6 +24,11 @@ import (
 	r "github.com/dancannon/gorethink"
 )
 
+const (
+	DBTableUsers              = "auth_users"
+	DBTableUsersUsernameIndex = "username"
+)
+
 func init() {
 	// Register the database manager for this module.
 	db.AddManager(new(dbManager))
@@ -45,7 +50,7 @@ func (m *dbManager) Version() *db.Version {
 
 func (m *dbManager) Create() error {
 	// Create the table.
-	err := db.CreateTable(dbTableUsers)
+	err := db.CreateTable(DBTableUsers)
 	if err != nil {
 		return err
 	}
@@ -55,13 +60,13 @@ func (m *dbManager) Create() error {
 
 func createIndexes() error {
 	// Create a secondary index on the LoginName attribute.
-	_, err := r.Table(dbTableUsers).IndexCreate(dbTableUsersUsernameIndex).Run(db.Session)
+	_, err := r.Table(DBTableUsers).IndexCreate(DBTableUsersUsernameIndex).Run(db.Session)
 	if err != nil {
 		return err
 	}
 
 	// Wait for the index to be ready to use.
-	_, err = r.Table(dbTableUsers).IndexWait(dbTableUsersUsernameIndex).Run(db.Session)
+	_, err = r.Table(DBTableUsers).IndexWait(DBTableUsersUsernameIndex).Run(db.Session)
 	if err != nil {
 		return err
 	}

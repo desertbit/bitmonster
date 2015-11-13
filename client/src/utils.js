@@ -193,7 +193,7 @@ var utils = (function() {
         // TODO: Improve the fingerprinting.
         var fingerprint = [
             navigator.userAgent,
-            [ screen.height, screen.width, screen.colorDepth ].join("x"),
+            screen.colorDepth,
             ( new Date() ).getTimezoneOffset(),
             !!window.sessionStorage,
             !!window.localStorage,

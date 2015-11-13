@@ -64,8 +64,10 @@ type Socket struct {
 
 	emitter *emission.Emitter
 
-	values      map[interface{}]interface{}
-	valuesMutex sync.Mutex
+	values             map[interface{}]interface{}
+	valuesMutex        sync.Mutex
+	valueTimeouts      map[interface{}]*time.Timer
+	valueTimeoutsMutex sync.Mutex
 }
 
 // ID returns the socket's unique ID.
@@ -168,9 +170,29 @@ func (s *Socket) DeleteValue(key interface{}) {
 }
 
 // DeleteValueAfterTimeout removes a custom value after the specified timeout.
+// Previously set timeouts for the same key are stopped.
 // This operation is thread-safe.
 func (s *Socket) DeleteValueAfterTimeout(key interface{}, timeout time.Duration) {
-	time.AfterFunc(timeout, func() {
+	// Lock the mutex.
+	s.valueTimeoutsMutex.Lock()
+	defer s.valueTimeoutsMutex.Unlock()
+
+	// Stop old the old timeout if present.
+	if t, ok := s.valueTimeouts[key]; ok {
+		t.Stop()
+	}
+
+	// Set and start the timeout.
+	s.valueTimeouts[key] = time.AfterFunc(timeout, func() {
+		// Remove the current timer again from the map.
+		func() {
+			// Lock the mutex.
+			s.valueTimeoutsMutex.Lock()
+			defer s.valueTimeoutsMutex.Unlock()
+
+			delete(s.valueTimeouts, key)
+		}()
+
 		s.DeleteValue(key)
 	})
 }
@@ -225,10 +247,11 @@ func OffCloseSocket(f OnNewSocketFunc) {
 func onNewSocket(s *glue.Socket) {
 	// Create the BitMonster Socket value.
 	socket := &Socket{
-		socket:    s,
-		chanCall:  s.Channel(channelCall),
-		chanEvent: s.Channel(channelEvent),
-		values:    make(map[interface{}]interface{}),
+		socket:        s,
+		chanCall:      s.Channel(channelCall),
+		chanEvent:     s.Channel(channelEvent),
+		values:        make(map[interface{}]interface{}),
+		valueTimeouts: make(map[interface{}]*time.Timer),
 	}
 
 	// Save itself to the glue Value.

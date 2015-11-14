@@ -53,6 +53,11 @@ func RegisterGroup(name string) error {
 	return nil
 }
 
+// Groups returns a slice of all registered groups.
+func Groups() []string {
+	return groups
+}
+
 //###############//
 //### Private ###//
 //###############//

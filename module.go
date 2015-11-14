@@ -89,6 +89,17 @@ func (m *Module) AddMethod(name string, method Method, hooks ...Hook) {
 	m.methods[name] = mc
 }
 
+// AddMethods adds the methods in the methods map.
+// Optionally pass hooks which are processed before.
+// This method is not thread-safe and should be only called during
+// module initialization.
+func (m *Module) AddMethods(methodsMap MethodMap, hooks ...Hook) {
+	// Iterate through the map and add all methods.
+	for name, method := range methodsMap {
+		m.AddMethod(name, method, hooks...)
+	}
+}
+
 // AddEvent adds and registers a new event.
 // The newly created event is returned.
 func (m *Module) AddEvent(name string, hooks ...Hook) *Event {

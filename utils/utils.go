@@ -94,3 +94,18 @@ func UnmarshalValues(data string) (first, second string, err error) {
 func MarshalValues(first, second string) string {
 	return strconv.Itoa(len(first)) + delimiter + first + second
 }
+
+// RemoveDuplicateStrings removes duplicate strings from a string slice.
+func RemoveDuplicateStrings(a []string) []string {
+	result := []string{}
+	seen := map[string]struct{}{}
+
+	for _, val := range a {
+		if _, ok := seen[val]; !ok {
+			result = append(result, val)
+			seen[val] = struct{}{}
+		}
+	}
+
+	return result
+}

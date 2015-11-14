@@ -28,13 +28,15 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
-//####################//
-//### Method Type ####//
-//####################//
+//#####################//
+//### Method Types# ###//
+//#####################//
 
 // A Method is a module method.
 // If an error is returned, the error callback on the client side is triggered.
 type Method func(*Context) error
+
+type MethodMap map[string]Method
 
 //######################//
 //### Private Types ####//

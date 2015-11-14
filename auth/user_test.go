@@ -50,6 +50,15 @@ func TestUserPasswords(t *testing.T) {
 }
 
 func TestUserGroups(t *testing.T) {
+	err := RegisterGroup("a")
+	require.Nil(t, err)
+
+	err = RegisterGroup("b")
+	require.Nil(t, err)
+
+	err = RegisterGroup("c")
+	require.Nil(t, err)
+
 	u, err := NewUser("foo", "bar", "foo@bar.at", "secretpassword")
 	require.Nil(t, err)
 	require.NotNil(t, u)
@@ -65,4 +74,10 @@ func TestUserGroups(t *testing.T) {
 
 	u.RemoveGroup("a", "b")
 	require.Len(t, u.Groups, 1)
+
+	u.Groups = []string{"a", "a", "a", "b", "c", "b", "a", "c"}
+	require.Len(t, u.Groups, 8)
+	err = u.Validate()
+	require.Nil(t, err)
+	require.Len(t, u.Groups, 3)
 }

@@ -1,8 +1,9 @@
 - Implement HTTP cookie authentication addition.
-- Auth module: remove user, add user, change password
-- Implement protocol version check.
+- add methods for the own user to change.
 
 ## General:
+- Implement protocol version check.
+- Provide a register user module/method.
 - Add more testing.
 
 ## Security:
@@ -14,6 +15,7 @@
 ## Authentication
 - Implement E-Mail verification. Also on registration.
 - Add an alternative method to GetUsers, which obtains a partial list of users (batched list).
+- Remove sensitive BCrypt hashes from error messages (gorethink errors).
 - Implemented key rotation (SecureCookie).
 - Rotate authentication tokens on login?
 - Simple DDOS and Bruteforce prevention.

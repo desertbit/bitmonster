@@ -23,11 +23,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/desertbit/bitmonster"
 	"github.com/desertbit/bitmonster/log"
 	"github.com/desertbit/bitmonster/settings"
 	"github.com/desertbit/bitmonster/utils"
+
+	"github.com/Sirupsen/logrus"
 )
 
 const (
@@ -69,13 +70,23 @@ func init() {
 	eventReauth = module.AddEvent("reauthenticate")
 
 	// Add module methods.
-	module.AddMethod("login", login)
-	module.AddMethod("logout", logout)
-	module.AddMethod("authenticate", authenticate)
+	module.AddMethods(bitmonster.MethodMap{
+		"login":        login,
+		"logout":       logout,
+		"authenticate": authenticate,
+	})
 
 	// Module methods which require admin rights.
-	module.AddMethod("getUser", getUser, MustAdminGroup())
-	module.AddMethod("getUsers", getUsers, MustAdminGroup())
+	module.AddMethods(bitmonster.MethodMap{
+		"getGroups":         getGroups,
+		"getUser":           getUser,
+		"getUsers":          getUsers,
+		"addUser":           addUser,
+		"deleteUser":        deleteUser,
+		"editUser":          editUser,
+		"changePassword":    changePassword,
+		"clearAuthSessions": clearAuthSessions,
+	}, MustAdminGroup())
 }
 
 //################################//
@@ -101,7 +112,7 @@ func login(c *bitmonster.Context) error {
 	}
 
 	// Get the user by the username.
-	user, err := GetUserByUsername(loginData.Username)
+	user, err := GetUser(loginData.Username)
 	if err != nil {
 		c.Error("invalid login credentials")
 		return nil
@@ -163,7 +174,7 @@ func login(c *bitmonster.Context) error {
 	user.AuthSessions[key] = as
 
 	// Create a new encrypted authentication token.
-	authToken, err := newAuthToken(user.ID, key, as.Token)
+	authToken, err := newAuthToken(user.Username, key, as.Token)
 	if err != nil {
 		return err
 	}
@@ -205,7 +216,6 @@ func logout(c *bitmonster.Context) error {
 	log.L.WithFields(logrus.Fields{
 		"remoteAddress": s.RemoteAddr(),
 		"user":          user.Username,
-		"userID":        user.ID,
 	}).Debugf("auth: logout")
 
 	// Get the current socket value.
@@ -266,7 +276,7 @@ func authenticate(c *bitmonster.Context) (err error) {
 		return err
 	}
 
-	// Obtain the user by the ID.
+	// Obtain the user.
 	user, err := GetUser(userID)
 	if err != nil {
 		return err
@@ -276,7 +286,6 @@ func authenticate(c *bitmonster.Context) (err error) {
 	log.L.WithFields(logrus.Fields{
 		"remoteAddress": s.RemoteAddr(),
 		"user":          user.Username,
-		"userID":        user.ID,
 	}).Debugf("auth: authentication request")
 
 	// Check if the authenticated sessions map is nil.
@@ -335,7 +344,7 @@ func authenticate(c *bitmonster.Context) (err error) {
 	// Update the auth socket value.
 	av.isAuth = true
 	av.authSessionKey = key
-	av.userID = user.ID
+	av.userID = user.Username
 
 	// Clear the cache.
 	clearCache(s)
@@ -347,8 +356,17 @@ func authenticate(c *bitmonster.Context) (err error) {
 	log.L.WithFields(logrus.Fields{
 		"remoteAddress": s.RemoteAddr(),
 		"user":          user.Username,
-		"userID":        user.ID,
 	}).Debugf("auth: authentication success")
+
+	return nil
+}
+
+func getGroups(c *bitmonster.Context) error {
+	// Obtain all groups.
+	groups := Groups()
+
+	// Set the groups slice as return data.
+	c.Data(groups)
 
 	return nil
 }
@@ -356,7 +374,6 @@ func authenticate(c *bitmonster.Context) (err error) {
 func getUser(c *bitmonster.Context) error {
 	// Obtain the data from the context.
 	data := struct {
-		ID       string `json:"id"`
 		Username string `json:"username"`
 	}{}
 
@@ -366,21 +383,9 @@ func getUser(c *bitmonster.Context) error {
 	}
 
 	// Obtain the user.
-	var user *User
-
-	if len(data.ID) > 0 {
-		user, err = GetUser(data.ID)
-		if err != nil {
-			return err
-		}
-	} else if len(data.Username) > 0 {
-		user, err = GetUserByUsername(data.Username)
-		if err != nil {
-			return err
-		}
-	} else {
-		c.Error("invalid method data passed")
-		return nil
+	user, err := GetUser(data.Username)
+	if err != nil {
+		return err
 	}
 
 	// Set the user as return data.
@@ -401,6 +406,9 @@ func getUsers(c *bitmonster.Context) error {
 		return err
 	}
 
+	// Prepare the data.
+	data.Groups = utils.RemoveDuplicateStrings(data.Groups)
+
 	// Obtain the users.
 	users, err := GetUsers(data.Groups...)
 	if err != nil {
@@ -409,6 +417,181 @@ func getUsers(c *bitmonster.Context) error {
 
 	// Set the users as return data.
 	c.Data(users)
+
+	return nil
+}
+
+func addUser(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		Username string `json:"username"`
+		Name     string `json:"name"`
+		EMail    string `json:"email"`
+		Password string `json:"password"`
+
+		Enabled bool     `json:"enabled"`
+		Groups  []string `json:"groups"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Prepare the data.
+	data.Groups = utils.RemoveDuplicateStrings(data.Groups)
+
+	// Create a new user value.
+	// Fields are validated by the function.
+	user, err := NewUser(data.Username, data.Name, data.EMail, data.Password)
+	if err != nil {
+		return err
+	}
+
+	// Set the additinal data fields.
+	user.Enabled = data.Enabled
+	user.Groups = data.Groups
+
+	// Add the user to the database.
+	err = AddUser(user)
+	if err != nil {
+		return err
+	}
+
+	// Set the newly created user as return data.
+	c.Data(user)
+
+	return nil
+}
+
+func deleteUser(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		Username string `json:"username"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Obtain the user.
+	user, err := GetUser(data.Username)
+	if err != nil {
+		return err
+	}
+
+	// Delete the user.
+	err = DeleteUser(user)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func editUser(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		Username string `json:"username"`
+
+		// All these values replace the values of the user:
+		Name    string   `json:"name"`
+		Email   string   `json:"email"`
+		Enabled bool     `json:"enabled"`
+		Groups  []string `json:"groups"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Prepare the data.
+	data.Groups = utils.RemoveDuplicateStrings(data.Groups)
+
+	// Obtain the user.
+	user, err := GetUser(data.Username)
+	if err != nil {
+		return err
+	}
+
+	// Update the user fields.
+	user.Name = data.Name
+	user.Email = data.Email
+	user.Enabled = data.Enabled
+	user.Groups = data.Groups
+
+	// Update the user in the database.
+	err = UpdateUser(user)
+	if err != nil {
+		return err
+	}
+
+	// Set the updated user as return data.
+	c.Data(user)
+
+	return nil
+}
+
+func changePassword(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Obtain the user.
+	user, err := GetUser(data.Username)
+	if err != nil {
+		return err
+	}
+
+	// Change the user's password.
+	err = user.ChangePassword(data.Password)
+	if err != nil {
+		return err
+	}
+
+	// Update the user in the database.
+	err = UpdateUser(user)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func clearAuthSessions(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		Username string `json:"username"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Obtain the user
+	user, err := GetUser(data.Username)
+	if err != nil {
+		return err
+	}
+
+	// Clear the authenticated sessions.
+	user.ClearAuthSessions()
+
+	// Update the user in the database.
+	err = UpdateUser(user)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

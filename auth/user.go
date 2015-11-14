@@ -25,7 +25,6 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/desertbit/bitmonster/db"
-	"github.com/desertbit/bitmonster/utils"
 
 	r "github.com/dancannon/gorethink"
 )
@@ -37,6 +36,7 @@ const (
 var (
 	ErrNotFound              = errors.New("not found")
 	ErrEmptyResult           = errors.New("empty result")
+	ErrEmailAlreadyExists    = errors.New("a user with the e-mail already exists")
 	ErrUsernameAlreadyExists = errors.New("a user with the username already exists")
 )
 
@@ -56,14 +56,14 @@ type AuthSession struct {
 type Users []*User
 
 type User struct {
-	ID        string    `gorethink:"id"         json:"id"           valid:"uuidv4,required"`
-	Username  string    `gorethink:"username"   json:"username"     valid:"printableascii,length(3|50),required"`
-	Name      string    `gorethink:"name"       json:"name"`
-	EMail     string    `gorethink:"email"      json:"email"        valid:"email,length(3|100),required"`
-	Enabled   bool      `gorethink:"enabled"    json:"enabled"`
+	Username string   `gorethink:"id"       json:"username"     valid:"printableascii,length(3|50),required"`
+	Name     string   `gorethink:"name"     json:"name"`
+	Email    string   `gorethink:"email"    json:"email"        valid:"email,length(3|100),required"`
+	Enabled  bool     `gorethink:"enabled"  json:"enabled"`
+	Groups   []string `gorethink:"groups"   json:"groups"`
+
 	Created   time.Time `gorethink:"created"    json:"created"`
 	LastLogin time.Time `gorethink:"lastLogin"  json:"lastLogin"`
-	Groups    []string  `gorethink:"groups"     json:"groups"`
 
 	AuthSessions AuthSessions `gorethink:"authSessions"    json:"-"`
 	PasswordHash string       `gorethink:"passwordHash"    json:"-"`
@@ -86,6 +86,13 @@ func (u *User) Validate() error {
 	}
 
 	return nil
+}
+
+// ClearAuthSessions removes all current authenticated sessions of the user.
+// This will force an overall relogin.
+func (u *User) ClearAuthSessions() {
+	// Reset the map.
+	u.AuthSessions = nil
 }
 
 // ChangePassword changes a user's password.
@@ -143,6 +150,17 @@ func (u *User) RemoveGroup(groups ...string) {
 	}
 }
 
+// HasGroup checks if the user is member of the group.
+func (u *User) HasGroup(group string) bool {
+	for _, g := range u.Groups {
+		if g == group {
+			return true
+		}
+	}
+
+	return false
+}
+
 //##############//
 //### Public ###//
 //##############//
@@ -150,10 +168,9 @@ func (u *User) RemoveGroup(groups ...string) {
 // NewUser creates a new user value.
 func NewUser(username, name, email, password string) (*User, error) {
 	u := &User{
-		ID:       utils.UUID(),
 		Username: username,
 		Name:     name,
-		EMail:    email,
+		Email:    email,
 		Enabled:  true,
 		Created:  time.Now(),
 	}
@@ -173,16 +190,16 @@ func NewUser(username, name, email, password string) (*User, error) {
 	return u, nil
 }
 
-// GetUserByUsername obtains a user by its username.
+// GetUser obtains a user by its username.
 // Returns a ErrNotFound error if the user does not exists.
-func GetUserByUsername(username string) (*User, error) {
+func GetUser(username string) (*User, error) {
 	if len(username) == 0 {
 		return nil, fmt.Errorf("failed to get user: username is empty")
 	}
 
-	rows, err := r.Table(DBTableUsers).GetAllByIndex(DBTableUsersUsernameIndex, username).Run(db.Session)
+	rows, err := r.Table(DBTableUsers).Get(username).Run(db.Session)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user by username '%s': %v", username, err)
+		return nil, fmt.Errorf("failed to get user '%s': %v", username, err)
 	}
 
 	var u User
@@ -193,22 +210,22 @@ func GetUserByUsername(username string) (*User, error) {
 			return nil, ErrNotFound
 		}
 
-		return nil, fmt.Errorf("failed to get user by username '%s': %v", username, err)
+		return nil, fmt.Errorf("failed to get user '%s': %v", username, err)
 	}
 
 	return &u, nil
 }
 
-// GetUser obtains a user by its ID.
+// GetUserByEmail obtains a user by its e-mail.
 // Returns a ErrNotFound error if the user does not exists.
-func GetUser(id string) (*User, error) {
-	if len(id) == 0 {
-		return nil, fmt.Errorf("failed to get user: ID is empty")
+func GetUserByEmail(email string) (*User, error) {
+	if len(email) == 0 {
+		return nil, fmt.Errorf("failed to get user by e-mail: e-mail is empty")
 	}
 
-	rows, err := r.Table(DBTableUsers).Get(id).Run(db.Session)
+	rows, err := r.Table(DBTableUsers).GetAllByIndex(DBTableUsersEmailIndex, email).Run(db.Session)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user by ID '%s': %v", id, err)
+		return nil, fmt.Errorf("failed to get user by e-mail '%s': %v", email, err)
 	}
 
 	var u User
@@ -219,13 +236,14 @@ func GetUser(id string) (*User, error) {
 			return nil, ErrNotFound
 		}
 
-		return nil, fmt.Errorf("failed to get user by ID '%s': %v", id, err)
+		return nil, fmt.Errorf("failed to get user by e-mail '%s': %v", email, err)
 	}
 
 	return &u, nil
 }
 
 // AddUser adds a new user to the database.
+// Returns ErrEmailAlreadyExists if the e-mail already exists.
 // Returns ErrUsernameAlreadyExists if the username already exists.
 func AddUser(u *User) error {
 	// Validate the struct
@@ -234,18 +252,26 @@ func AddUser(u *User) error {
 		return err
 	}
 
-	// Check if a previous user with the same username exists.
-	cu, err := GetUserByUsername(u.Username)
+	// Check if a user is already registered with the same username.
+	cu, err := GetUser(u.Username)
 	if err != nil && err != ErrNotFound {
 		return err
 	} else if cu != nil {
 		return ErrUsernameAlreadyExists
 	}
 
+	// Check if a user is already registered with the same e-mail.
+	cu, err = GetUserByEmail(u.Email)
+	if err != nil && err != ErrNotFound {
+		return err
+	} else if cu != nil {
+		return ErrEmailAlreadyExists
+	}
+
 	// Insert the user to the database.
 	_, err = r.Table(DBTableUsers).Insert(u).RunWrite(db.Session)
 	if err != nil {
-		return fmt.Errorf("failed to insert new user '%s' to database: id '%s': %v", u.Username, u.ID, err)
+		return fmt.Errorf("failed to insert new user '%s' to database: %v", u.Username, err)
 	}
 
 	// Trigger the event.
@@ -257,9 +283,9 @@ func AddUser(u *User) error {
 // DeleteUser removes a user from the database.
 func DeleteUser(u *User) error {
 	// Delete the user from the database.
-	_, err := r.Table(DBTableUsers).Get(u.ID).Delete().RunWrite(db.Session)
+	_, err := r.Table(DBTableUsers).Get(u.Username).Delete().RunWrite(db.Session)
 	if err != nil {
-		return fmt.Errorf("failed to delete user '%s' from database: id '%s': %v", u.Username, u.ID, err)
+		return fmt.Errorf("failed to delete user '%s' from database: %v", u.Username, err)
 	}
 
 	// Trigger the event.
@@ -278,7 +304,7 @@ func UpdateUser(u *User) error {
 	}
 
 	// Update the user.
-	_, err = r.Table(DBTableUsers).Get(u.ID).Replace(u).RunWrite(db.Session)
+	_, err = r.Table(DBTableUsers).Get(u.Username).Replace(u).RunWrite(db.Session)
 	if err != nil {
 		return fmt.Errorf("failed to update user '%s' in database: %v", u.Username, err)
 	}

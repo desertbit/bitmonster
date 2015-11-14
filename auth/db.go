@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	DBTableUsers              = "auth_users"
-	DBTableUsersUsernameIndex = "username"
+	DBTableUsers           = "auth_users"
+	DBTableUsersEmailIndex = "email"
 )
 
 func init() {
@@ -60,13 +60,13 @@ func (m *dbManager) Create() error {
 
 func createIndexes() error {
 	// Create a secondary index on the LoginName attribute.
-	_, err := r.Table(DBTableUsers).IndexCreate(DBTableUsersUsernameIndex).Run(db.Session)
+	_, err := r.Table(DBTableUsers).IndexCreate(DBTableUsersEmailIndex).Run(db.Session)
 	if err != nil {
 		return err
 	}
 
 	// Wait for the index to be ready to use.
-	_, err = r.Table(DBTableUsers).IndexWait(DBTableUsersUsernameIndex).Run(db.Session)
+	_, err = r.Table(DBTableUsers).IndexWait(DBTableUsersEmailIndex).Run(db.Session)
 	if err != nil {
 		return err
 	}

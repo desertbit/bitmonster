@@ -21,10 +21,12 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/desertbit/bitmonster/db"
+	"github.com/desertbit/bitmonster/utils"
 
 	r "github.com/dancannon/gorethink"
 )
@@ -34,9 +36,8 @@ const (
 )
 
 var (
-	ErrNotFound              = errors.New("not found")
 	ErrEmptyResult           = errors.New("empty result")
-	ErrEmailAlreadyExists    = errors.New("a user with the e-mail already exists")
+	ErrUserNotFound          = errors.New("user not found")
 	ErrUsernameAlreadyExists = errors.New("a user with the username already exists")
 )
 
@@ -56,11 +57,12 @@ type AuthSession struct {
 type Users []*User
 
 type User struct {
-	Username string   `gorethink:"id"       json:"username"     valid:"printableascii,length(3|50),required"`
-	Name     string   `gorethink:"name"     json:"name"`
-	Email    string   `gorethink:"email"    json:"email"        valid:"email,length(3|100),required"`
-	Enabled  bool     `gorethink:"enabled"  json:"enabled"`
-	Groups   []string `gorethink:"groups"   json:"groups"`
+	ID       string   `gorethink:"id"        json:"id"           valid:"uuidv4,required"`
+	Username string   `gorethink:"username"  json:"username"     valid:"printableascii,length(3|50),required"`
+	Name     string   `gorethink:"name"      json:"name"`
+	Email    string   `gorethink:"email"     json:"email"        valid:"email,length(3|100),required"`
+	Enabled  bool     `gorethink:"enabled"   json:"enabled"`
+	Groups   []string `gorethink:"groups"    json:"groups"`
 
 	Created   time.Time `gorethink:"created"    json:"created"`
 	LastLogin time.Time `gorethink:"lastLogin"  json:"lastLogin"`
@@ -168,6 +170,7 @@ func (u *User) HasGroup(group string) bool {
 // NewUser creates a new user value.
 func NewUser(username, name, email, password string) (*User, error) {
 	u := &User{
+		ID:       utils.UUID(),
 		Username: username,
 		Name:     name,
 		Email:    email,
@@ -190,16 +193,42 @@ func NewUser(username, name, email, password string) (*User, error) {
 	return u, nil
 }
 
-// GetUser obtains a user by its username.
-// Returns a ErrNotFound error if the user does not exists.
-func GetUser(username string) (*User, error) {
+// GetUser obtains a user by its ID.
+// Returns a ErrUserNotFound error if the user does not exists.
+func GetUser(id string) (*User, error) {
+	if len(id) == 0 {
+		return nil, fmt.Errorf("failed to get user by ID: ID is empty")
+	}
+
+	rows, err := r.Table(DBTableUsers).Get(id).Run(db.Session)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by ID '%s': %v", id, err)
+	}
+
+	var u User
+	err = rows.One(&u)
+	if err != nil {
+		// Check if nothing was found.
+		if err == r.ErrEmptyResult {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf("failed to get user by ID '%s': %v", id, err)
+	}
+
+	return &u, nil
+}
+
+// GetUserByUsername obtains a user by its username.
+// Returns a ErrUserNotFound error if the user does not exists.
+func GetUserByUsername(username string) (*User, error) {
 	if len(username) == 0 {
-		return nil, fmt.Errorf("failed to get user: username is empty")
+		return nil, fmt.Errorf("failed to get user by username: username is empty")
 	}
 
-	rows, err := r.Table(DBTableUsers).Get(username).Run(db.Session)
+	rows, err := r.Table(DBTableUsers).GetAllByIndex(DBTableUsersUsernameIndex, username).Run(db.Session)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user '%s': %v", username, err)
+		return nil, fmt.Errorf("failed to get user by username '%s': %v", username, err)
 	}
 
 	var u User
@@ -207,45 +236,29 @@ func GetUser(username string) (*User, error) {
 	if err != nil {
 		// Check if nothing was found.
 		if err == r.ErrEmptyResult {
-			return nil, ErrNotFound
+			return nil, ErrUserNotFound
 		}
 
-		return nil, fmt.Errorf("failed to get user '%s': %v", username, err)
+		return nil, fmt.Errorf("failed to get user by username '%s': %v", username, err)
 	}
 
 	return &u, nil
 }
 
-// GetUserByEmail obtains a user by its e-mail.
-// Returns a ErrNotFound error if the user does not exists.
-func GetUserByEmail(email string) (*User, error) {
-	if len(email) == 0 {
-		return nil, fmt.Errorf("failed to get user by e-mail: e-mail is empty")
-	}
-
-	rows, err := r.Table(DBTableUsers).GetAllByIndex(DBTableUsersEmailIndex, email).Run(db.Session)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user by e-mail '%s': %v", email, err)
-	}
-
-	var u User
-	err = rows.One(&u)
-	if err != nil {
-		// Check if nothing was found.
-		if err == r.ErrEmptyResult {
-			return nil, ErrNotFound
-		}
-
-		return nil, fmt.Errorf("failed to get user by e-mail '%s': %v", email, err)
-	}
-
-	return &u, nil
-}
+// Hack for AddUser.
+// -----------------
+var addUserMutex sync.Mutex
 
 // AddUser adds a new user to the database.
-// Returns ErrEmailAlreadyExists if the e-mail already exists.
 // Returns ErrUsernameAlreadyExists if the username already exists.
 func AddUser(u *User) error {
+	// Start Hack.
+	// -----------
+	addUserMutex.Lock()
+	defer addUserMutex.Unlock()
+	// ---------
+	// END Hack.
+
 	// Validate the struct
 	err := u.Validate()
 	if err != nil {
@@ -253,26 +266,48 @@ func AddUser(u *User) error {
 	}
 
 	// Check if a user is already registered with the same username.
-	cu, err := GetUser(u.Username)
-	if err != nil && err != ErrNotFound {
+	cu, err := GetUserByUsername(u.Username)
+	if err != nil && err != ErrUserNotFound {
 		return err
 	} else if cu != nil {
 		return ErrUsernameAlreadyExists
 	}
 
-	// Check if a user is already registered with the same e-mail.
-	cu, err = GetUserByEmail(u.Email)
-	if err != nil && err != ErrNotFound {
-		return err
-	} else if cu != nil {
-		return ErrEmailAlreadyExists
-	}
-
 	// Insert the user to the database.
 	_, err = r.Table(DBTableUsers).Insert(u).RunWrite(db.Session)
 	if err != nil {
-		return fmt.Errorf("failed to insert new user '%s' to database: %v", u.Username, err)
+		return fmt.Errorf("failed to insert new user '%s' to database: id '%s': %v", u.Username, u.ID, err)
 	}
+
+	// Start Hack.
+	// -----------
+	// Recheck if the username is unique.
+	// This has to be done, because there is no atomic way to ensure that the username field is unique.
+	// See: https://github.com/rethinkdb/rethinkdb/issues/1716
+	// See TODO.
+	rows, err := r.Table(DBTableUsers).GetAllByIndex(DBTableUsersUsernameIndex, u.Username).Count().Run(db.Session)
+	if err != nil {
+		return fmt.Errorf("failed to get newly created user by username '%s': %v", u.Username, err)
+	}
+
+	// Get the count.
+	var count int
+	err = rows.One(&count)
+	if err != nil {
+		return err
+	}
+
+	// If there are multiple users with the same username, then remove the newly created user again.
+	if count > 1 {
+		// Delete the user from the database.
+		_, err := r.Table(DBTableUsers).Get(u.ID).Delete().RunWrite(db.Session)
+		if err != nil {
+			return fmt.Errorf("failed to delete duplicate user '%s' from database: id '%s': %v", u.Username, u.ID, err)
+		}
+		return ErrUsernameAlreadyExists
+	}
+	// ---------
+	// END Hack.
 
 	// Trigger the event.
 	emitter.Emit(emitterOnNewUser, u)
@@ -283,9 +318,9 @@ func AddUser(u *User) error {
 // DeleteUser removes a user from the database.
 func DeleteUser(u *User) error {
 	// Delete the user from the database.
-	_, err := r.Table(DBTableUsers).Get(u.Username).Delete().RunWrite(db.Session)
+	_, err := r.Table(DBTableUsers).Get(u.ID).Delete().RunWrite(db.Session)
 	if err != nil {
-		return fmt.Errorf("failed to delete user '%s' from database: %v", u.Username, err)
+		return fmt.Errorf("failed to delete user '%s' from database: id '%s': %v", u.Username, u.ID, err)
 	}
 
 	// Trigger the event.
@@ -295,7 +330,9 @@ func DeleteUser(u *User) error {
 }
 
 // UpdateUser updates a user in the database.
-// The user value replaces the document stored in the database.
+// The user fields replace all fields of the document stored in the database.
+// Don't call this function if the username of the user was changed.
+// Instead use ChangeUsername to change usernames.
 func UpdateUser(u *User) error {
 	// Validate the struct
 	err := u.Validate()
@@ -304,9 +341,52 @@ func UpdateUser(u *User) error {
 	}
 
 	// Update the user.
-	_, err = r.Table(DBTableUsers).Get(u.Username).Replace(u).RunWrite(db.Session)
+	_, err = r.Table(DBTableUsers).Get(u.ID).Replace(u).RunWrite(db.Session)
 	if err != nil {
-		return fmt.Errorf("failed to update user '%s' in database: %v", u.Username, err)
+		return fmt.Errorf("failed to update user '%s' in database: id '%s': %v", u.Username, u.ID, err)
+	}
+
+	return nil
+}
+
+// Hack for ChangeUsername.
+// ------------------------
+var changeUsernameMutex sync.Mutex
+
+// ChangeUsername changes the username of the user in the database.
+// Returns ErrUsernameAlreadyExists if the username already exists.
+// Hint: This implementation is currently not atomic if multiple BitMonster
+// instances are used to provide the backend service.
+// This is due to limitations of the RethinkDB database.
+// See TODO.
+// See: https://github.com/rethinkdb/rethinkdb/issues/1716
+func ChangeUsername(u *User, newUsername string) error {
+	// Start Hack.
+	// -----------
+	changeUsernameMutex.Lock()
+	defer changeUsernameMutex.Unlock()
+	// ---------
+	// END Hack.
+
+	if len(newUsername) == 0 {
+		return fmt.Errorf("failed to change username: new username is empty")
+	}
+
+	// Check if a user is already registered with the new username.
+	cu, err := GetUserByUsername(newUsername)
+	if err != nil && err != ErrUserNotFound {
+		return err
+	} else if cu != nil {
+		return ErrUsernameAlreadyExists
+	}
+
+	// Set the new username.
+	u.Username = newUsername
+
+	// Update the user in the database.
+	err = UpdateUser(u)
+	if err != nil {
+		return err
 	}
 
 	return nil

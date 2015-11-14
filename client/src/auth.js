@@ -34,9 +34,9 @@ bm.auth = (function() {
      */
 
     // Get the authentication module.
-    var module        = bm.module("auth"),
-        fingerprint   = false,
-        authUsername  = false;
+    var module      = bm.module("auth"),
+        fingerprint = false,
+        authUserID  = false;
 
 
     /*
@@ -45,7 +45,7 @@ bm.auth = (function() {
     var instance = {
         login:         login,
         logout:        logout,
-        getUsername:   getUsername,
+        getUserID:     getUserID,
         isAuth:        isAuth,
 
         // Triggered if the session is authenticated (After a successful login).
@@ -126,7 +126,7 @@ bm.auth = (function() {
 
         var callErrorCallback = function(err) {
             // Reset the current authenticated user.
-            setCurrentUsername(false);
+            setCurrentUserID(false);
 
             if (errorCallback) {
                 utils.callCatch(errorCallback, err);
@@ -141,14 +141,14 @@ bm.auth = (function() {
 
         module.call("authenticate", data, function(data) {
             // Validate, that a correct user is returned.
-            if (!data.username) {
+            if (!data.id) {
                 callErrorCallback("invalid user data received");
                 logout();
                 return;
             }
 
             // Set the current authenticated user.
-            setCurrentUsername(data.username);
+            setCurrentUserID(data.id);
 
             // Call the success callback.
             if (callback) {
@@ -199,7 +199,7 @@ bm.auth = (function() {
 
     function logout() {
         // Reset the current authenticated user.
-        setCurrentUsername(false);
+        setCurrentUserID(false);
 
         // Remove the authentication token.
         deleteAuthToken();
@@ -213,34 +213,34 @@ bm.auth = (function() {
         });
     }
 
-    function setCurrentUsername(username) {
+    function setCurrentUserID(userID) {
         // Skip if nothing has changed.
         // This will prevent triggering the events multiple times.
-        if (authUsername === username) {
+        if (authUserID === userID) {
             return;
         }
 
-        // Set the new username.
-        authUsername = username;
+        // Set the new user ID.
+        authUserID = userID;
 
         // Trigger the events.
         $(instance).trigger('authChanged');
 
-        if (authUsername) {
+        if (authUserID) {
             $(instance).trigger('onAuth');
         }
     }
 
     // Returns false if not logged in.
-    function getUsername() {
-        if (!authUsername) {
+    function getUserID() {
+        if (!authUserID) {
             return false;
         }
-        return authUsername;
+        return authUserID;
     }
 
     function isAuth() {
-        if (!authUsername) {
+        if (!authUserID) {
             return false;
         }
         return true;

@@ -74,10 +74,4 @@ func TestUserGroups(t *testing.T) {
 
 	u.RemoveGroup("a", "b")
 	require.Len(t, u.Groups, 1)
-
-	u.Groups = []string{"a", "a", "a", "b", "c", "b", "a", "c"}
-	require.Len(t, u.Groups, 8)
-	err = u.Validate()
-	require.Nil(t, err)
-	require.Len(t, u.Groups, 3)
 }

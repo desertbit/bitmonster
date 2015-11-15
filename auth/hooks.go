@@ -81,7 +81,7 @@ func (h *groupHook) Hook(c *bitmonster.Context) error {
 		}
 	}
 
-	return fmt.Errorf("socket session is not authenticated: not member of required group(s)")
+	return fmt.Errorf("socket session is not authorized: not member of required group(s)")
 }
 
 type isAuthHook struct {
@@ -89,7 +89,7 @@ type isAuthHook struct {
 
 func (h *isAuthHook) Hook(c *bitmonster.Context) error {
 	if !IsAuth(c.Socket()) {
-		return fmt.Errorf("socket session is not authenticated")
+		return fmt.Errorf("socket session is not authorized")
 	}
 
 	return nil

@@ -13,16 +13,24 @@
 	<script>
 		var bm = BitMonster();
 
-		bm.auth.onAuthChanged(function() {
-			console.log("is Auth: " + bm.auth.isAuth());
-		})
-
 		bm.auth.login("foo", "asdfghjkl", function() {
 			console.log("login success!");
 		}, function(err) {
 			console.log("failed to login: " + err);
 		});
 
+		bm.auth.onAuth(function() {
+			bm.module('auth').call("admin.getGroups", function(data) {
+				console.log("get groups: " + data);
+			}, function(err) {
+				console.log("failed to get groups: " + err);
+			});
+		})
+
+
+
+
+/*
 		// Get the users module.
 		var users = bm.module("users");
 
@@ -31,7 +39,7 @@
 			console.log(data);
 		});
 
-/*
+
 		users.call("get", {
 			name:   "Sample",
 			foo:    "bar"

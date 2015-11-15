@@ -78,21 +78,29 @@ func init() {
 
 	// Module methods which require admin rights.
 	module.AddMethods(bitmonster.MethodMap{
-		"getGroups":         getGroups,
-		"getUser":           getUser,
-		"getUsers":          getUsers,
-		"addUser":           addUser,
-		"deleteUser":        deleteUser,
-		"editUser":          editUser,
-		"changeUsername":    changeUsername,
-		"changePassword":    changePassword,
-		"clearAuthSessions": clearAuthSessions,
+		"admin.getGroups":         getGroups,
+		"admin.getUser":           getUser,
+		"admin.getUsers":          getUsers,
+		"admin.addUser":           addUser,
+		"admin.deleteUser":        deleteUser,
+		"admin.editUser":          editUser,
+		"admin.changeUsername":    changeUsername,
+		"admin.changePassword":    changePassword,
+		"admin.clearAuthSessions": clearAuthSessions,
 	}, MustAdminGroup())
+
+	// Module methods which require only an authenticated session.
+	module.AddMethods(bitmonster.MethodMap{
+		"user.getUser":           getCurrentUser,
+		"user.editUser":          editCurrentUser,
+		"user.changePassword":    changePasswordOfCurrentUser,
+		"user.clearAuthSessions": clearAuthSessionsOfCurrentUser,
+	}, MustIsAuth())
 }
 
-//################################//
-//### Private - Module Methods ###//
-//################################//
+//######################//
+//### Module Methods ###//
+//######################//
 
 func login(c *bitmonster.Context) error {
 	// Obtain the authentication data from the context.
@@ -365,6 +373,10 @@ func authenticate(c *bitmonster.Context) (err error) {
 	return nil
 }
 
+//##############################//
+//### Module Methods - Admin ###//
+//##############################//
+
 func getGroups(c *bitmonster.Context) error {
 	// Obtain all groups.
 	groups := Groups()
@@ -625,6 +637,116 @@ func clearAuthSessions(c *bitmonster.Context) error {
 
 	// Obtain the user
 	user, err := GetUser(data.ID)
+	if err != nil {
+		return err
+	}
+
+	// Clear the authenticated sessions.
+	user.ClearAuthSessions()
+
+	// Update the user in the database.
+	err = UpdateUser(user)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//#############################//
+//### Module Methods - User ###//
+//#############################//
+
+func getCurrentUser(c *bitmonster.Context) error {
+	// Obtain the current user.
+	user, err := CurrentUser(c.Socket())
+	if err != nil {
+		return err
+	}
+
+	// Set the user as return data.
+	c.Data(user)
+
+	return nil
+}
+
+func editCurrentUser(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		// All these values replace the values of the user:
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Obtain the current user.
+	user, err := CurrentUser(c.Socket())
+	if err != nil {
+		return err
+	}
+
+	// Update the user fields.
+	user.Name = data.Name
+	user.Email = data.Email
+
+	// Update the user in the database.
+	err = UpdateUser(user)
+	if err != nil {
+		return err
+	}
+
+	// Set the updated user as return data.
+	c.Data(user)
+
+	return nil
+}
+
+func changePasswordOfCurrentUser(c *bitmonster.Context) error {
+	// Obtain the data from the context.
+	data := struct {
+		OldPassword string `json:"oldPassword"`
+		NewPassword string `json:"newPassword"`
+	}{}
+
+	err := c.Decode(&data)
+	if err != nil {
+		return err
+	}
+
+	// Obtain the current user.
+	user, err := CurrentUser(c.Socket())
+	if err != nil {
+		return err
+	}
+
+	// Check if the old password is valid.
+	if match := user.ComparePasswords(data.OldPassword); !match {
+		c.Error("wrong_password")
+		return nil
+	}
+
+	// Change the user's password.
+	err = user.ChangePassword(data.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	// Update the user in the database.
+	err = UpdateUser(user)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func clearAuthSessionsOfCurrentUser(c *bitmonster.Context) error {
+	// Obtain the current user.
+	user, err := CurrentUser(c.Socket())
 	if err != nil {
 		return err
 	}

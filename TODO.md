@@ -1,5 +1,5 @@
+- Create auth README with JSON requests and return data.
 - Implement HTTP cookie authentication addition.
-- add methods for the own user to change.
 - auth module methods: return useful error values. (Sample: changeUsername: 'already_exists')
 
 ## General:
@@ -15,6 +15,7 @@
 
 ## Authentication
 - Implement E-Mail verification. Also on registration.
+- Verify the E-Mail set by the current user by sending an e-mail. (editCurrentUser)
 - Add an alternative method to GetUsers, which obtains a partial list of users (batched list).
 - Remove sensitive BCrypt hashes from error messages (gorethink errors).
 - Simple DDOS and Bruteforce prevention.

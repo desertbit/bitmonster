@@ -1,0 +1,26 @@
+{
+  "name": "bitmonster",
+  "version": "0.0.1",
+  "homepage": "https://github.com/desertbit/bitmonster",
+  "authors": [
+    "Roland Singer <roland.singer@desertbit.com>"
+  ],
+  "description": "A powerful platform for your real-time mobile or web application",
+  "main": "[\"client\"]",
+  "keywords": [
+    "[\"socket\", \"real-time\", \"backend\"]"
+  ],
+  "license": "GPL3",
+  "ignore": [
+    "**/*",
+    "!client/*",
+    "!client/**/*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.4"
+  }
+}

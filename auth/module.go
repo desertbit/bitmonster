@@ -37,9 +37,10 @@ const (
 )
 
 const (
-	maxAuthSessions        = 20
-	authSessionKeyLength   = 20
-	authSessionTokenLength = 30
+	maxAuthSessions            = 20
+	authSessionKeyLength       = 20
+	authSessionTokenLength     = 30
+	authSessionHTTPTokenLength = 30
 )
 
 var (
@@ -103,6 +104,9 @@ func init() {
 //######################//
 
 func login(c *bitmonster.Context) error {
+	// Get the socket.
+	s := c.Socket()
+
 	// Obtain the authentication data from the context.
 	loginData := struct {
 		Username    string `json:"username"`
@@ -166,6 +170,7 @@ func login(c *bitmonster.Context) error {
 	as := &AuthSession{
 		Fingerprint: fingerprint,
 		Token:       utils.RandomString(authSessionTokenLength),
+		HTTPToken:   utils.RandomString(authSessionHTTPTokenLength),
 		Created:     timeNow,
 		LastAuth:    timeNow,
 	}
@@ -181,6 +186,13 @@ func login(c *bitmonster.Context) error {
 
 	// Add it to the map with the key.
 	user.AuthSessions[key] = as
+
+	// Set the new HTTP authentication token.
+	// This is used by the HTTP request to set the cookie.
+	err = setNewHTTPAuthToken(s, as.HTTPToken)
+	if err != nil {
+		return err
+	}
 
 	// Create a new encrypted authentication token.
 	authToken, err := newAuthToken(user.ID, key, as.Token)
@@ -320,7 +332,7 @@ func authenticate(c *bitmonster.Context) (err error) {
 
 	// Compare the tokens in a constant time span.
 	if subtle.ConstantTimeCompare([]byte(as.Token), []byte(token)) != 1 {
-		return fmt.Errorf("invalid authentication data")
+		return fmt.Errorf("invalid authentication token")
 	}
 
 	// Compare the fingerprints.
@@ -329,7 +341,20 @@ func authenticate(c *bitmonster.Context) (err error) {
 		return fmt.Errorf("invalid fingerprint: %v", err)
 	}
 
+	// Wait for the HTTP authentication.
+	// Obtain the token from the HTTP cookie and validate it.
+	httpToken, err := getHTTPAuthToken(s)
+	if err != nil {
+		return fmt.Errorf("HTTP authentication failed: %v", err)
+	}
+
+	// Compare the HTTP tokens in a constant time span.
+	if subtle.ConstantTimeCompare([]byte(as.HTTPToken), []byte(httpToken)) != 1 {
+		return fmt.Errorf("invalid HTTP authentication token")
+	}
+
 	// Hint: Authentication success.
+	// -----------------------------
 
 	// Update the timestamps.
 	user.LastLogin = timeNow

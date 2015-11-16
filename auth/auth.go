@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/desertbit/bitmonster"
 	"github.com/desertbit/bitmonster/log"
 )
@@ -233,41 +233,3 @@ func checkSocketAuthentication(s *bitmonster.Socket) {
 		resetAuthSocketValue(s)
 	})
 }
-
-// TODO//#####################################################################################
-/*
-const (
-	httpHandleURL = "/bitmonster/auth"
-)
-
-
-func init() {
-	// Register the HTTP handler.
-	http.HandleFunc(httpHandleURL, handleAuthRequest)
-}
-
-func handleAuthRequest(rw http.ResponseWriter, req *http.Request) {
-	// Only allow POST requests
-	if req.Method != "POST" {
-		http.Error(rw, "Bad Request", 400)
-		return
-	}
-
-	// Obtain the auth request key from the POST body.
-	// Get the instance ID from the POST query.
-	key := req.PostFormValue("key")
-	if len(key) == 0 {
-		http.Error(rw, "Bad Request", 400)
-		return
-	}
-
-	// Obtain the socket with the key.
-	s := getAuthRequestSocket(key)
-	if s == nil {
-		http.Error(rw, "Bad Request", 400)
-		return
-	}
-
-	// TODO: Check origin.
-}
-*/

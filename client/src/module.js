@@ -28,7 +28,7 @@ bm.module = (function() {
 
     var callbackIDLength      = 14,
         eventListenerIDLength = 10,
-        methodCallTimeout     = 10000; // 10 seconds
+        methodCallTimeout     = 12000; // 12 seconds
 
 
 

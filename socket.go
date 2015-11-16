@@ -71,7 +71,7 @@ type Socket struct {
 }
 
 // ID returns the socket's unique ID.
-// This ID is a totally random.
+// This is a cryptographically secure pseudorandom number.
 func (s *Socket) ID() string {
 	return s.socket.ID()
 }

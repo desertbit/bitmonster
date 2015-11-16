@@ -26,7 +26,8 @@ bm.auth = (function() {
      * Constants
      */
 
-    var authTokenID = "BMAuthToken";
+    var authTokenID = "BMAuthToken",
+        httpAuthURL = "/bitmonster/auth";
 
 
     /*
@@ -100,6 +101,8 @@ bm.auth = (function() {
         }
         else {
             // Use a cookie as storage alternative.
+            // Set any cookie path and domain.
+            // Also set the secure HTTPS flag. This cookie is only used in javascript.
             utils.cookies.setItem(authTokenID, token, (1*60*60*24*30));
         }
     }
@@ -128,10 +131,42 @@ bm.auth = (function() {
             // Reset the current authenticated user.
             setCurrentUserID(false);
 
+            // Remove the authentication token.
+            deleteAuthToken();
+
             if (errorCallback) {
                 utils.callCatch(errorCallback, err);
+                // Reset to trigger only once.
+                errorCallback = undefined;
             }
         };
+
+        // Create the HTTP data.
+        var httpData = {
+            type:      "auth",
+            socketID:  socket.socketID()
+        };
+
+        // Send the http authentication request to confirm the cookie.
+        var reqXhr = $.ajax({
+            url: httpAuthURL,
+            success: function () {
+                // Reset.
+                reqXhr = false;
+            },
+            error: function (r, msg) {
+                // Reset.
+                reqXhr = false;
+
+                // Call the error callback.
+                var err = "HTTP authentication failed";
+                if (msg) { err += ": " + msg; }
+                callErrorCallback(err);
+            },
+            type: "POST",
+            data: JSON.stringify(httpData),
+            timeout: 7000
+        });
 
         // Create the module method parameters.
         var data = {
@@ -155,6 +190,11 @@ bm.auth = (function() {
                 utils.callCatch(callback);
             }
         }, function(err) {
+            // Kill the ajax request.
+            if (reqXhr) {
+                reqXhr.abort();
+            }
+
             callErrorCallback(err);
         });
 
@@ -162,39 +202,107 @@ bm.auth = (function() {
     }
 
     function login(username, password, callback, errorCallback) {
-        var callErrorCallback = function(err) {
-            if (errorCallback) {
-                utils.callCatch(errorCallback, err);
-            }
-        };
+        var performLogin = function() {
+            var callErrorCallback = function(err) {
+                // Call the callback.
+                if (errorCallback) {
+                    utils.callCatch(errorCallback, err);
+                    // Reset to trigger only once.
+                    errorCallback = undefined;
+                }
+            };
 
-        if (!username || !password) {
-            callErrorCallback("invalid login credentials");
-            return;
-        }
-
-        // Create the module method parameters.
-        var data = {
-            username: username,
-            password: password,
-            fingerprint: getFingerprint()
-        };
-
-        module.call("login", data, function(data) {
-            // Check if the auth token is received.
-            if (!data.token) {
-                callErrorCallback("login failed: invalid authentication token");
+            if (!username || !password) {
+                callErrorCallback("invalid login credentials");
                 return;
             }
 
-            // Set the auth token.
-            setAuthToken(data.token);
+            // This method triggers the authentication request as soon as
+            // the login call and the HTTP request finished.
+            var triggerAuthRequestCount = 0;
+            var triggerAuthRequest = function() {
+                triggerAuthRequestCount++;
+                if (triggerAuthRequestCount < 2) {
+                    return;
+                }
 
-            // Finally authenticate the session.
-            authenticate(callback, errorCallback);
-        }, function(err) {
-            callErrorCallback(err);
-        });
+                // Finally authenticate the session.
+                if (!authenticate(callback, errorCallback)) {
+                    callErrorCallback("authentication failed");
+                    return;
+                }
+            };
+
+            // Create the HTTP data.
+            var httpData = {
+                type:      "login",
+                socketID:  socket.socketID()
+            };
+
+            // Send the http login request to set the cookie.
+            // We don't have acces through javascript.
+            // This is a security precaution.
+            var reqXhr = $.ajax({
+                url: httpAuthURL,
+                success: function () {
+                    // Reset.
+                    reqXhr = false;
+
+                    // Trigger the authentication request as soon as all requests are ready.
+                    triggerAuthRequest();
+                },
+                error: function (r, msg) {
+                    // Reset.
+                    reqXhr = false;
+
+                    // Call the error callback.
+                    var err = "HTTP authentication failed";
+                    if (msg) { err += ": " + msg; }
+                    callErrorCallback(err);
+                },
+                type: "POST",
+                data: JSON.stringify(httpData),
+                timeout: 7000
+            });
+
+            // Create the module method parameters.
+            var data = {
+                username: username,
+                password: password,
+                fingerprint: getFingerprint()
+            };
+
+            module.call("login", data, function(data) {
+                // Check if the auth token is received.
+                if (!data.token) {
+                    callErrorCallback("login failed: invalid authentication token");
+                    return;
+                }
+
+                // Set the auth token.
+                setAuthToken(data.token);
+
+                // Trigger the authentication request as soon as all requests are ready.
+                triggerAuthRequest();
+            }, function(err) {
+                // Kill the ajax request.
+                if (reqXhr) {
+                    reqXhr.abort();
+                }
+
+                // Call the error callback.
+                callErrorCallback(err);
+            });
+        };
+
+        // If the socket is not connected yet, then trigger the login
+        // first as soon as a connection is established.
+        // Otherwise the socketID() is empty.
+        if (socket.state() !== "connected") {
+            socket.on("connected", performLogin);
+        } else {
+            performLogin();
+        }
     }
 
     function logout() {

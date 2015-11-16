@@ -1,5 +1,4 @@
 - Create auth README with JSON requests and return data.
-- Implement HTTP cookie authentication addition.
 - auth module methods: return useful error values. (Sample: changeUsername: 'already_exists')
 
 ## General:

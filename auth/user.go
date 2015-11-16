@@ -50,6 +50,7 @@ type AuthSessions map[string]*AuthSession
 type AuthSession struct {
 	Fingerprint string    `gorethink:"fingerprint"`
 	Token       string    `gorethink:"token"`
+	HTTPToken   string    `gorethink:"httpToken"`
 	Created     time.Time `gorethink:"created"`
 	LastAuth    time.Time `gorethink:"lastAuth"`
 }

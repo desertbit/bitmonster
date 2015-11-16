@@ -90,7 +90,7 @@ type settings struct {
 
 	// Whenever this application is accessible through a secure HTTPs connection.
 	// This flag affects some important security mechanisms, as settings the secure flag on cookies.
-	SecureHttpsAccess bool
+	SecureHTTPSAccess bool
 
 	// Database settings:
 	DBAddress   string        `envconfig:"DB_ADDRESS"`
@@ -163,8 +163,8 @@ func Prepare() error {
 		log.L.Warning("[WARNING] settings: the default authentication block key is set! You should replace this with a secret key!")
 	}
 
-	// Print a warning if the SecureHttpsAccess flag is false.
-	if !Settings.SecureHttpsAccess {
+	// Print a warning if the SecureHTTPSAccess flag is false.
+	if !Settings.SecureHTTPSAccess {
 		log.L.Warning("[WARNING] settings: the secure https access flag is false! You should provide a secure https access!")
 	}
 

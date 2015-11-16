@@ -332,10 +332,12 @@ bm.auth = (function() {
         authUserID = userID;
 
         // Trigger the events.
-        $(instance).trigger('authChanged');
-
         if (authUserID) {
+            $(instance).trigger('authChanged', [true]);
             $(instance).trigger('onAuth');
+        }
+        else {
+            $(instance).trigger('authChanged', [false]);
         }
     }
 

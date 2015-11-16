@@ -13,11 +13,15 @@
 	<script>
 		var bm = BitMonster();
 
-		/*bm.auth.login("foo", "asdfghjkl", function() {
+	 	bm.auth.login("foo", "asdfghjkl", function() {
 			console.log("login success!");
 		}, function(err) {
 			console.log("failed to login: " + err);
-		});*/
+		});
+
+		bm.auth.onAuthChanged(function(e, auth) {
+			console.log("isAuth: " + auth);
+		});
 
 		bm.auth.onAuth(function() {
 			bm.module('auth').call("admin.getGroups", function(data) {

@@ -23,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -143,6 +144,27 @@ func Init() error {
 	glueOpts := glue.Options{
 		HTTPListenAddress: settings.Settings.ListenAddress,
 		HTTPHandleURL:     socketHandleURL,
+	}
+
+	// Set the CheckOrigin function if allowed origins are specified in the settings.
+	if len(settings.Settings.AllowOrigin) > 0 {
+		allowedOrigins := settings.Settings.AllowOrigin
+		glueOpts.CheckOrigin = func(r *http.Request) bool {
+			origin := r.Header["Origin"]
+			if len(origin) == 0 {
+				return true
+			}
+			u, err := url.Parse(origin[0])
+			if err != nil {
+				return false
+			}
+			for _, o := range allowedOrigins {
+				if o == u.Host {
+					return true
+				}
+			}
+			return false
+		}
 	}
 
 	// Set the socket type.

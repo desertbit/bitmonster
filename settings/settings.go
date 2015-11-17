@@ -92,6 +92,11 @@ type settings struct {
 	// This flag affects some important security mechanisms, as settings the secure flag on cookies.
 	SecureHTTPSAccess bool
 
+	// The allowed origins of the connecting sockets.
+	// If empty, then the host in the Origin header must not be set or
+	// must match the host of the request.
+	AllowOrigin []string
+
 	// Database settings:
 	DBAddress   string        `envconfig:"DB_ADDRESS"`
 	DBAddresses []string      `envconfig:"DB_ADDRESSES"`

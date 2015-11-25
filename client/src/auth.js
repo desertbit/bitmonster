@@ -157,11 +157,6 @@ bm.auth = (function() {
             error: function (r, msg) {
                 // Reset.
                 reqXhr = false;
-
-                // Call the error callback.
-                var err = "HTTP authentication failed";
-                if (msg) { err += ": " + msg; }
-                callErrorCallback(err);
             },
             type: "POST",
             data: JSON.stringify(httpData),
@@ -254,11 +249,6 @@ bm.auth = (function() {
                 error: function (r, msg) {
                     // Reset.
                     reqXhr = false;
-
-                    // Call the error callback.
-                    var err = "HTTP authentication failed";
-                    if (msg) { err += ": " + msg; }
-                    callErrorCallback(err);
                 },
                 type: "POST",
                 data: JSON.stringify(httpData),

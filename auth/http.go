@@ -161,11 +161,22 @@ func handleHTTPAuthRequest(rw http.ResponseWriter, req *http.Request) {
 				return 400, fmt.Errorf("failed to parse cookie value: %v", err)
 			}
 
-			// Write the token to the channel.
+			// Write the token to the channel. Remove the old token if the channel is full.
 			select {
 			case ha.getTokenChan <- token:
 			default:
-				return 500, fmt.Errorf("token channel is full")
+				// Remove the old value in a non-blocking way.
+				select {
+				case <-ha.getTokenChan:
+				default:
+				}
+
+				// Set the new value in a non-blocking way.
+				select {
+				case ha.getTokenChan <- token:
+				default:
+					return 500, fmt.Errorf("token channel is full")
+				}
 			}
 		} else {
 			return 400, fmt.Errorf("invalid request type: '%s'", data.Type)
@@ -221,10 +232,22 @@ func setNewHTTPAuthToken(s *bitmonster.Socket, token string) error {
 		return fmt.Errorf("failed to obtain HTTP auth socket value")
 	}
 
+	// If the channel is already full, then remove the old value and set the new one.
 	select {
 	case ha.newTokenChan <- token:
 	default:
-		return fmt.Errorf("failed to set new HTTP auth socket token: channel is full")
+		// Remove the old value in a non-blocking way.
+		select {
+		case <-ha.newTokenChan:
+		default:
+		}
+
+		// Set the new value in a non-blocking way.
+		select {
+		case ha.newTokenChan <- token:
+		default:
+			return fmt.Errorf("failed to set new HTTP auth socket token: channel is full")
+		}
 	}
 
 	return nil

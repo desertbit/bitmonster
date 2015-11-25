@@ -13,6 +13,7 @@
 - Combine the gorethink database logging with the BitMonster logging.
 
 ## Authentication
+- HTTP authentication: add random token which is confirmed by the authentication module method.
 - Implement E-Mail verification. Also on registration.
 - Verify the E-Mail set by the current user by sending an e-mail. (editCurrentUser)
 - Add an alternative method to GetUsers, which obtains a partial list of users (batched list).

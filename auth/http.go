@@ -87,6 +87,24 @@ func handleHTTPAuthRequest(rw http.ResponseWriter, req *http.Request) {
 
 	// Create an inline function for better error handling.
 	httpStatusCode, err := func() (int, error) {
+		// Check the origin.
+		if !bitmonster.CheckOrigin(req) {
+			return 400, fmt.Errorf("origin not allowed")
+		}
+
+		// Set the required HTTP headers if cross origin requests are allowed.
+		if len(settings.Settings.AllowOrigin) > 0 {
+			// Parse the origin url.
+			origin := req.Header["Origin"]
+			if len(origin) == 0 || len(origin[0]) == 0 {
+				return 400, fmt.Errorf("failed to set header: Access-Control-Allow-Origin: HTTP request origin header is empty")
+			}
+
+			rw.Header().Set("Access-Control-Allow-Origin", origin[0])   // Set allowed origin.
+			rw.Header().Set("Access-Control-Allow-Credentials", "true") // Allow to set cookies.
+			rw.Header().Set("Access-Control-Allow-Methods", "POST")     // Only allow POST requests.
+		}
+
 		// The data value.
 		data := struct {
 			Type     string `json:"type"`

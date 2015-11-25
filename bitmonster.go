@@ -144,27 +144,7 @@ func Init() error {
 	glueOpts := glue.Options{
 		HTTPListenAddress: settings.Settings.ListenAddress,
 		HTTPHandleURL:     socketHandleURL,
-	}
-
-	// Set the CheckOrigin function if allowed origins are specified in the settings.
-	if len(settings.Settings.AllowOrigin) > 0 {
-		allowedOrigins := settings.Settings.AllowOrigin
-		glueOpts.CheckOrigin = func(r *http.Request) bool {
-			origin := r.Header["Origin"]
-			if len(origin) == 0 {
-				return true
-			}
-			u, err := url.Parse(origin[0])
-			if err != nil {
-				return false
-			}
-			for _, o := range allowedOrigins {
-				if o == u.Host {
-					return true
-				}
-			}
-			return false
-		}
+		CheckOrigin:       CheckOrigin, // Set to the custom implementation.
 	}
 
 	// Set the socket type.
@@ -228,6 +208,39 @@ func Run() error {
 // during the application shutdown.
 func ReleasedChan() <-chan struct{} {
 	return releasedChan
+}
+
+// CheckOrigin returns true if the request Origin header is acceptable.
+// Returns true if the origin is set and is equal to the request host.
+// If the AllowOrigin hosts are set in the settings, then this origin has to match
+// one of those.
+func CheckOrigin(r *http.Request) bool {
+	// Obtain the origin.
+	origin := r.Header["Origin"]
+	if len(origin) == 0 {
+		return false
+	}
+
+	// Obtain the origin host.
+	u, err := url.Parse(origin[0])
+	if err != nil {
+		return false
+	}
+	originHost := u.Host
+
+	// Check if allowed origins are specified in the settings.
+	if len(settings.Settings.AllowOrigin) > 0 {
+		// The origin has to match one of the allowed origins.
+		for _, o := range settings.Settings.AllowOrigin {
+			if o == originHost {
+				return true
+			}
+		}
+		return false
+	}
+
+	// The origin has to be equal to the request host.
+	return originHost == r.Host
 }
 
 //###############//

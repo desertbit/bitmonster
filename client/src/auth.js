@@ -160,7 +160,10 @@ bm.auth = (function() {
             },
             type: "POST",
             data: JSON.stringify(httpData),
-            timeout: 7000
+            timeout: 7000,
+            xhrFields: {
+                withCredentials: true // Allow to send cookies.
+            }
         });
 
         // Create the module method parameters.
@@ -252,7 +255,10 @@ bm.auth = (function() {
                 },
                 type: "POST",
                 data: JSON.stringify(httpData),
-                timeout: 7000
+                timeout: 7000,
+                xhrFields: {
+                    withCredentials: true // Allow to send cookies.
+                }
             });
 
             // Create the module method parameters.

@@ -27,7 +27,7 @@ bm.auth = (function() {
      */
 
     var authTokenID = "BMAuthToken",
-        httpAuthURL = "/bitmonster/auth";
+        httpAuthURL = host + "/bitmonster/auth";
 
 
     /*

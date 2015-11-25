@@ -30,6 +30,11 @@ var BitMonster = function(host) {
     // BitMonster object
     var bm = {};
 
+    // If host is undefined, then set it to an empty string.
+    if (!host) {
+        host = "";
+    }
+
     // Include the dependencies.
     @@include('./utils.js')
     @@include('./translate/translate.js')

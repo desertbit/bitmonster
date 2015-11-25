@@ -1,4 +1,5 @@
 - Create auth README with JSON requests and return data.
+- Implement firewall module with hooks to protect against ddos. Add these hooks to the auth package including the http requests.
 - auth module methods: return useful error values. (Sample: changeUsername: 'already_exists')
 
 ## General:

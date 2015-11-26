@@ -98,24 +98,3 @@ func parseAuthToken(encoded string) (userID, key, token string, err error) {
 
 	return data.UserID, data.Key, data.Token, nil
 }
-
-// newHTTPAuthToken creates a new encrypted HTTP authentication token.
-func newHTTPAuthToken(token string) (string, error) {
-	encoded, err := secureCookie.Encode(cookieName, token)
-	if err != nil {
-		return "", err
-	}
-
-	return encoded, nil
-}
-
-// parseHTTPAuthToken parses an encrypted HTTP authentication token.
-func parseHTTPAuthToken(encoded string) (token string, err error) {
-	// Decrypt to the authentication data.
-	err = secureCookie.Decode(cookieName, encoded, &token)
-	if err != nil {
-		return
-	}
-
-	return token, nil
-}

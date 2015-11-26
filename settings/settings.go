@@ -88,10 +88,6 @@ type settings struct {
 	// value: path
 	FileServer FileServer
 
-	// Whenever this application is accessible through a secure HTTPs connection.
-	// This flag affects some important security mechanisms, as settings the secure flag on cookies.
-	SecureHTTPSAccess bool
-
 	// The allowed origins of the connecting sockets.
 	// If empty, then the host in the Origin header must not be set or
 	// must match the host of the request.
@@ -166,11 +162,6 @@ func Prepare() error {
 	}
 	if Settings.AuthBlockKey == defaultAuthBlockKey {
 		log.L.Warning("[WARNING] settings: the default authentication block key is set! You should replace this with a secret key!")
-	}
-
-	// Print a warning if the SecureHTTPSAccess flag is false.
-	if !Settings.SecureHTTPSAccess {
-		log.L.Warning("[WARNING] settings: the secure https access flag is false! You should provide a secure https access!")
 	}
 
 	return nil

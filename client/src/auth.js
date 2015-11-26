@@ -26,8 +26,7 @@ bm.auth = (function() {
      * Constants
      */
 
-    var authTokenID = "BMAuthToken",
-        httpAuthURL = host + "/bitmonster/auth";
+    var authTokenID = "BMAuthToken";
 
 
     /*
@@ -102,7 +101,7 @@ bm.auth = (function() {
         else {
             // Use a cookie as storage alternative.
             // Set any cookie path and domain.
-            // Also set the secure HTTPS flag. This cookie is only used in javascript.
+            // This cookie is only used in javascript.
             utils.cookies.setItem(authTokenID, token, (1*60*60*24*30));
         }
     }
@@ -120,6 +119,8 @@ bm.auth = (function() {
     }
 
     // authenticate this client with the saved auth data.
+    // Returns false if no authentication data is present.
+    // If no authentication data is present, then the error callback is not triggered.
     function authenticate(callback, errorCallback) {
         // Get the auth token.
         var authToken = getAuthToken();
@@ -141,59 +142,44 @@ bm.auth = (function() {
             }
         };
 
-        // Create the HTTP data.
-        var httpData = {
-            type:      "auth",
-            socketID:  socket.socketID()
-        };
-
-        // Send the http authentication request to confirm the cookie.
-        var reqXhr = $.ajax({
-            url: httpAuthURL,
-            success: function () {
-                // Reset.
-                reqXhr = false;
-            },
-            error: function (r, msg) {
-                // Reset.
-                reqXhr = false;
-            },
-            type: "POST",
-            data: JSON.stringify(httpData),
-            timeout: 7000,
-            xhrFields: {
-                withCredentials: true // Allow to send cookies.
-            }
-        });
-
         // Create the module method parameters.
         var data = {
             token:         authToken,
             fingerprint:   getFingerprint()
         };
 
-        module.call("authenticate", data, function(data) {
+        // The success callback for the authentication request.
+        var onSuccess = function(data) {
             // Validate, that a correct user is returned.
-            if (!data.id) {
+            if (!data.user || !data.user.id) {
                 callErrorCallback("invalid user data received");
                 logout();
                 return;
             }
 
+            // Check if the authentication token has changed.
+            if (data.token) {
+                // Set the new auth token.
+                setAuthToken(data.token);
+            }
+
             // Set the current authenticated user.
-            setCurrentUserID(data.id);
+            setCurrentUserID(data.user.id);
 
             // Call the success callback.
             if (callback) {
                 utils.callCatch(callback);
             }
-        }, function(err) {
-            // Kill the ajax request.
-            if (reqXhr) {
-                reqXhr.abort();
-            }
+        };
 
-            callErrorCallback(err);
+        // Perform the actual authentication.
+        module.call("authenticate", data, onSuccess, function(err) {
+            // On error, retry once again.
+            // The authentication token might have changed just in that moment
+            // in another tab session.
+            module.call("authenticate", data, onSuccess, function(err) {
+                callErrorCallback(err);
+            });
         });
 
         return true;
@@ -215,52 +201,6 @@ bm.auth = (function() {
                 return;
             }
 
-            // This method triggers the authentication request as soon as
-            // the login call and the HTTP request finished.
-            var triggerAuthRequestCount = 0;
-            var triggerAuthRequest = function() {
-                triggerAuthRequestCount++;
-                if (triggerAuthRequestCount < 2) {
-                    return;
-                }
-
-                // Finally authenticate the session.
-                if (!authenticate(callback, errorCallback)) {
-                    callErrorCallback("authentication failed");
-                    return;
-                }
-            };
-
-            // Create the HTTP data.
-            var httpData = {
-                type:      "login",
-                socketID:  socket.socketID()
-            };
-
-            // Send the http login request to set the cookie.
-            // We don't have acces through javascript.
-            // This is a security precaution.
-            var reqXhr = $.ajax({
-                url: httpAuthURL,
-                success: function () {
-                    // Reset.
-                    reqXhr = false;
-
-                    // Trigger the authentication request as soon as all requests are ready.
-                    triggerAuthRequest();
-                },
-                error: function (r, msg) {
-                    // Reset.
-                    reqXhr = false;
-                },
-                type: "POST",
-                data: JSON.stringify(httpData),
-                timeout: 7000,
-                xhrFields: {
-                    withCredentials: true // Allow to send cookies.
-                }
-            });
-
             // Create the module method parameters.
             var data = {
                 username: username,
@@ -278,14 +218,12 @@ bm.auth = (function() {
                 // Set the auth token.
                 setAuthToken(data.token);
 
-                // Trigger the authentication request as soon as all requests are ready.
-                triggerAuthRequest();
-            }, function(err) {
-                // Kill the ajax request.
-                if (reqXhr) {
-                    reqXhr.abort();
+                // Finally authenticate the session.
+                if (!authenticate(callback, errorCallback)) {
+                    callErrorCallback("authentication failed");
+                    return;
                 }
-
+            }, function(err) {
                 // Call the error callback.
                 callErrorCallback(err);
             });

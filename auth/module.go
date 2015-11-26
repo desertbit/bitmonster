@@ -37,10 +37,11 @@ const (
 )
 
 const (
-	maxAuthSessions            = 20
-	authSessionKeyLength       = 20
-	authSessionTokenLength     = 30
-	authSessionHTTPTokenLength = 30
+	maxAuthSessions        = 20
+	authSessionKeyLength   = 20
+	authSessionTokenLength = 30
+
+	authSessionTokenLifetime = time.Minute
 )
 
 var (
@@ -104,9 +105,6 @@ func init() {
 //######################//
 
 func login(c *bitmonster.Context) error {
-	// Get the socket.
-	s := c.Socket()
-
 	// Obtain the authentication data from the context.
 	loginData := struct {
 		Username    string `json:"username"`
@@ -168,11 +166,11 @@ func login(c *bitmonster.Context) error {
 
 	// Create a new authenticated session.
 	as := &AuthSession{
-		Fingerprint: fingerprint,
-		Token:       utils.RandomString(authSessionTokenLength),
-		HTTPToken:   utils.RandomString(authSessionHTTPTokenLength),
-		Created:     timeNow,
-		LastAuth:    timeNow,
+		Fingerprint:  fingerprint,
+		Token:        utils.RandomString(authSessionTokenLength),
+		TokenCreated: timeNow,
+		Created:      timeNow,
+		LastAuth:     timeNow,
 	}
 
 	// Create a new unique key for it.
@@ -186,13 +184,6 @@ func login(c *bitmonster.Context) error {
 
 	// Add it to the map with the key.
 	user.AuthSessions[key] = as
-
-	// Set the new HTTP authentication token.
-	// This is used by the HTTP request to set the cookie.
-	err = setNewHTTPAuthToken(s, as.HTTPToken)
-	if err != nil {
-		return err
-	}
 
 	// Create a new encrypted authentication token.
 	authToken, err := newAuthToken(user.ID, key, as.Token)
@@ -341,24 +332,34 @@ func authenticate(c *bitmonster.Context) (err error) {
 		return fmt.Errorf("invalid fingerprint: %v", err)
 	}
 
-	// Wait for the HTTP authentication.
-	// Obtain the token from the HTTP cookie and validate it.
-	httpToken, err := getHTTPAuthToken(s)
-	if err != nil {
-		return fmt.Errorf("HTTP authentication failed: %v", err)
-	}
-
-	// Compare the HTTP tokens in a constant time span.
-	if subtle.ConstantTimeCompare([]byte(as.HTTPToken), []byte(httpToken)) != 1 {
-		return fmt.Errorf("invalid HTTP authentication token")
-	}
-
 	// Hint: Authentication success.
 	// -----------------------------
 
 	// Update the timestamps.
 	user.LastLogin = timeNow
 	as.LastAuth = timeNow
+
+	// If the token is expired, then create a new token.
+	// This ensures an authentication token rotation.
+	var authToken string
+	if as.TokenCreated.Add(authSessionTokenLifetime).Before(timeNow) {
+		// Create a new random token.
+		as.Token = utils.RandomString(authSessionTokenLength)
+		as.TokenCreated = timeNow
+
+		// Create a new encrypted authentication token.
+		authToken, err = newAuthToken(user.ID, key, as.Token)
+		if err != nil {
+			return err
+		}
+
+		// Debug log.
+		log.L.WithFields(logrus.Fields{
+			"remoteAddress": s.RemoteAddr(),
+			"user":          user.Username,
+			"userID":        user.ID,
+		}).Debugf("auth: authentication token rotated")
+	}
 
 	// Update the user in the database.
 	err = UpdateUser(user)
@@ -385,8 +386,17 @@ func authenticate(c *bitmonster.Context) (err error) {
 	// Clear the cache.
 	clearCache(s)
 
-	// Set the current logged in user as return data.
-	c.Data(user)
+	// Create the respond data.
+	data := struct {
+		Token string `json:"token"`
+		User  *User  `json:"user"`
+	}{
+		Token: authToken,
+		User:  user,
+	}
+
+	// Set it.
+	c.Data(data)
 
 	// Debug log.
 	log.L.WithFields(logrus.Fields{

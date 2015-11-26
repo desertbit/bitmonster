@@ -9,6 +9,7 @@
 
 ## Security:
 - DDOS prevention.
+- Add support for a custom pin in the client javascript code to encrypt the authentication token, instead of just using the fingerprint.
 
 ## Database
 - Combine the gorethink database logging with the BitMonster logging.

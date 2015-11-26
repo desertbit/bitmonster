@@ -89,10 +89,25 @@ bm.auth = (function() {
             }
         }
 
+        // If not present, just return.
+        if (!token) {
+            return "";
+        }
+
+        // Decrypt. The password is not secure, but this is better than saving
+        // the token in plaintext in the storage.
+        // A possible extension would be to ask the user for a pin...
+        token = sjcl.decrypt(getFingerprint(), token);
+
         return token;
     }
 
     function setAuthToken(token) {
+        // Encrypt. The password is not secure, but this is better than saving
+        // the token in plaintext in the storage.
+        // A possible extension would be to ask the user for a pin...
+        token = sjcl.encrypt(getFingerprint(), token);
+
         // Check if the local storage is available.
         if (utils.storageAvailable('localStorage')) {
             // Save the token in the local storage.

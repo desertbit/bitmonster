@@ -17,6 +17,7 @@
  */
 
 // Include the required libraries directly.
+@@include('../bower_components/sjcl/sjcl.js')
 @@include('../bower_components/glue-socket/client/dist/glue.js')
 
 // Include the polyfills.

@@ -147,6 +147,12 @@ func Init() error {
 		CheckOrigin:       CheckOrigin, // Set to the custom implementation.
 	}
 
+	// Enable the Cross-Origin Resource Sharing (CORS) mechanism
+	// if additional origins are set.
+	if len(settings.Settings.AllowOrigin) > 0 {
+		glueOpts.EnableCORS = true
+	}
+
 	// Set the socket type.
 	if settings.Settings.SocketType == settings.SocketTypeTCP {
 		glueOpts.HTTPSocketType = glue.HTTPSocketTypeTCP

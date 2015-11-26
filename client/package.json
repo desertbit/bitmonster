@@ -1,6 +1,6 @@
 {
   "name": "bitmonster",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "A Monster handling your Bits",
   "main": "gulpfile.js",
   "dependencies": {

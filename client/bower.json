@@ -1,6 +1,6 @@
 {
   "name": "bitmonster",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "authors": [
     "Roland Singer <roland.singer@desertbit.com>"
   ],
@@ -16,7 +16,7 @@
     "tests"
   ],
   "dependencies": {
-    "glue-socket": "~1.7.0",
+    "glue-socket": "~1.8.0",
     "jquery": "~2.1.4",
     "sjcl": "~1.0.3"
   }

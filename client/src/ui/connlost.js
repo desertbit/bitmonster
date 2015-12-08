@@ -30,8 +30,6 @@ var connlost = (function () {
 		timeout = false;
 
 	var notify = bm.notification({
-		title: tr.socket.ConnLostTitle,
-		text: tr.socket.ConnLostText,
 		destroyOnClose: false,
 		hideClose: true
 	});
@@ -43,9 +41,19 @@ var connlost = (function () {
      * Public Methods
      */
 
-    instance.show = function() {
+    instance.show = function(connecting) {
 		if (timeout !== false) {
 			return;
+		}
+
+		// Set the title and text.
+		if (connecting) {
+			notify.setTitle(tr.socket.ConnectingTitle);
+			notify.setText(tr.socket.ConnectingText);
+		}
+		else {
+			notify.setTitle(tr.socket.ConnLostTitle);
+			notify.setText(tr.socket.ConnLostText);
 		}
 
 		timeout = setTimeout(function() {

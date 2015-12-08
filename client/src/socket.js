@@ -23,6 +23,13 @@
 
 var socket = (function () {
     /*
+     * Variables
+     */
+
+    var initialConnectedOnce = false;
+
+
+    /*
      * Socket Initialization
      */
 
@@ -37,15 +44,18 @@ var socket = (function () {
     }
 
     socket.on("connected", function() {
+        // Set the flag.
+        initialConnectedOnce = true;
+
         connlost.hide();
     });
 
     socket.on("connecting", function() {
-        connlost.show();
+        connlost.show(!initialConnectedOnce);
     });
 
     socket.on("reconnecting", function() {
-        connlost.show();
+        connlost.show(!initialConnectedOnce);
     });
 
     socket.on("disconnected", function() {

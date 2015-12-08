@@ -18,6 +18,8 @@
 
 {
 	socket: {
+		ConnectingTitle: "Connecting",
+		ConnectingText:  "Connecting to Server...",
 		ConnLostTitle: "Connection Lost",
 		ConnLostText:  "Trying to reconnect to Server...",
 		DiscardNotSendDataTitle: "Unsend Data",

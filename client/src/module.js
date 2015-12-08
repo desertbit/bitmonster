@@ -58,7 +58,13 @@ bm.module = (function() {
          };
 
          // Parse the JSON to an object.
-         data = JSON.parse(data);
+         try {
+             data = JSON.parse(data);
+         }
+         catch(e) {
+             logError();
+             return;
+         }
 
          // The callback ID has to be always defined.
          if (!data.callbackID || String(data.callbackID).length === 0) {
@@ -106,7 +112,13 @@ bm.module = (function() {
          };
 
          // Parse the JSON to an object.
-         data = JSON.parse(data);
+         try {
+             data = JSON.parse(data);
+         }
+         catch(e) {
+             logError();
+             return;
+         }
 
          // Check for the required values.
          if (!data.module || !data.event) {
@@ -133,7 +145,13 @@ bm.module = (function() {
              // Parse the JSON data value if present.
              var eventData;
              if (data.data) {
-                 eventData = JSON.parse(data.data);
+                 try {
+                     eventData = JSON.parse(data.data);
+                 }
+                 catch(e) {
+                     logError();
+                     return;
+                 }
              }
 
              // Create a shallow copy to allow mutations inside the iteration.

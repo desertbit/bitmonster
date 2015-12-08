@@ -26,7 +26,8 @@ bm.auth = (function() {
      * Constants
      */
 
-    var authTokenID = "BMAuthToken";
+    var authTokenID = "BMAuthToken",
+        authDataID  = "BMAuthData";
 
 
     /*
@@ -71,6 +72,51 @@ bm.auth = (function() {
         }
 
         return fingerprint;
+    }
+
+    // Loads the authentication states from the local storage.
+    function loadAuthData() {
+        // Skip if the local storage is not available.
+        if (!utils.storageAvailable('localStorage')) {
+            return;
+        }
+
+        // Load the data from the local storage.
+        var data = localStorage[authDataID];
+        if (!data) {
+            return;
+        }
+
+        // Try to parse the JSON.
+        try {
+            data = JSON.parse(data);
+        }
+        catch(e) {
+            console.log("failed to decode saved auth data JSON: " + e);
+            return;
+        }
+
+        // Set the values if present.
+        if (data.authUserID) {
+            authUserID = data.authUserID;
+        }
+    }
+
+    // Saves the authentication states to the local storage.
+    // Important for a browser reload.
+    function saveAuthData() {
+        // Skip if the local storage is not available.
+        if (!utils.storageAvailable('localStorage')) {
+            return;
+        }
+
+        // Create the data object.
+        var data = {
+            authUserID: authUserID
+        };
+
+        // Save to the local storage.
+        localStorage.setItem(authDataID, JSON.stringify(data));
     }
 
     function getAuthToken() {
@@ -280,6 +326,9 @@ bm.auth = (function() {
         // Set the new user ID.
         authUserID = userID;
 
+        // Save the authentication data to include the new changes.
+        saveAuthData();
+
         // Trigger the events.
         if (authUserID) {
             $(instance).trigger('authChanged', [true]);
@@ -310,6 +359,10 @@ bm.auth = (function() {
     /*
      * Initialization
      */
+
+    // Load the authentication states from the cache.
+    // This is useful for a browser reload.
+    loadAuthData();
 
     // Authenticate as soon as the socket connects.
     socket.on("connected", function() {

@@ -45,16 +45,15 @@ gulp.task('sass', function () {
 });
 
 
-gulp.task('watch', ['default'], function () {
+gulp.task('watch', ['debug'], function () {
   gulp.watch(['./src/*.js', './src/**/*.js'], ['js']);
   gulp.watch(['./src/*.css', './src/**/*.css'], ['sass']);
 });
 
 
-gulp.task('debug', function() {
+gulp.task('setdebug', function() {
 	debug = true;
 });
 
-gulp.task('default', ['sass', 'bower', 'js'], function() {
-
-});
+gulp.task('debug', ['setdebug', 'default'], function() {});
+gulp.task('default', ['sass', 'bower', 'js'], function() {});

@@ -1,8 +1,15 @@
+- Add a cache and hot cache.
+- Increase the cache timeout for glue to 20 seconds?
+- Events are bound twice due to the connected_and_auth internal event?
+- Implement HTTPS2
+- Error callback for events
+- Implement a bitmonster cache object which listens for changefeeds...
 - Create auth README with JSON requests and return data.
 - Implement firewall module with hooks to protect against ddos. Add these hooks to the auth package.
 - auth module methods: return useful error values. (Sample: changeUsername: 'already_exists')
 
 ## General:
+- Reduce the password iterations of the client side token encryption
 - Implement protocol version check.
 - Provide a register user module/method.
 - Add more testing.

@@ -332,7 +332,7 @@ func handleEventRequest(s *Socket, data string) {
 	log.L.WithFields(logrus.Fields{
 		"remoteAddress": s.RemoteAddr(),
 		"module":        opts.Module,
-		"method":        opts.Event,
+		"event":         opts.Event,
 	}).Debugf("bind event")
 
 	// Run hooks function.

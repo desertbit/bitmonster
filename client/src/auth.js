@@ -92,7 +92,7 @@ bm.auth = (function() {
             data = JSON.parse(data);
         }
         catch(e) {
-            console.log("failed to decode saved auth data JSON: " + e);
+            console.log("BitMonster: failed to decode saved auth data JSON: " + e);
             return;
         }
 
@@ -143,7 +143,14 @@ bm.auth = (function() {
         // Decrypt. The password is not secure, but this is better than saving
         // the token in plaintext in the storage.
         // A possible extension would be to ask the user for a pin...
-        token = sjcl.decrypt(getFingerprint(), token);
+        // Try to parse the JSON.
+        try {
+            token = sjcl.decrypt(getFingerprint(), token);
+        }
+        catch(e) {
+            console.log("BitMonster: failed to decrypt authentication token: " + e);
+            return "";
+        }
 
         return token;
     }
@@ -152,7 +159,13 @@ bm.auth = (function() {
         // Encrypt. The password is not secure, but this is better than saving
         // the token in plaintext in the storage.
         // A possible extension would be to ask the user for a pin...
-        token = sjcl.encrypt(getFingerprint(), token);
+        try {
+            token = sjcl.encrypt(getFingerprint(), token);
+        }
+        catch(e) {
+            console.log("BitMonster: failed to encrypt authentication token: " + e);
+            return;
+        }
 
         // Check if the local storage is available.
         if (utils.storageAvailable('localStorage')) {

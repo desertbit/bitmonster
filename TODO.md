@@ -1,5 +1,5 @@
+- auth.js: merge the auth token and the auth data into a single encrypted string which is saved together in the local storage. Remove it and invalidate it if something failed.
 - Add a cache and hot cache.
-- Increase the cache timeout for glue to 20 seconds?
 - Events are bound twice due to the connected_and_auth internal event?
 - Implement HTTPS2
 - Error callback for events

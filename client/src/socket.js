@@ -37,7 +37,7 @@ var socket = (function () {
     // Optional pass a host string. This host string is defined in the main BitMonster file.
     var socket = glue(host, {
         baseURL:                "/bitmonster/",
-        resetSendBufferTimeout: 20000
+        resetSendBufferTimeout: 20000           // 20 seconds.
     });
     if (!socket) {
     	console.log("BitMonster: failed to initialize socket!");

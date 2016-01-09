@@ -6,7 +6,8 @@ var gulp 		 = require('gulp'),
     uglify 		 = require('gulp-uglify'),
     gulpif 		 = require('gulp-if'),
     fileinclude  = require('gulp-file-include'),
-    sass 	     = require('gulp-sass');
+    sass 	     = require('gulp-sass'),
+    rename       = require("gulp-rename");
 
 var debug = false;
 
@@ -18,6 +19,16 @@ gulp.task('bower', function() {
 
 gulp.task('js', ['bower'], function () {
   gulp.src(['src/BitMonster.js'])
+      .pipe(fileinclude({
+          prefix: '@@',
+          basepath: '@file'
+      }))
+      .pipe(sourcemaps.init())
+      .pipe(sourcemaps.write())
+      .pipe(gulp.dest('./dist/'));
+
+
+  gulp.src(['src/BitMonster.js'])
     .pipe(fileinclude({
         prefix: '@@',
         basepath: '@file'
@@ -25,8 +36,9 @@ gulp.task('js', ['bower'], function () {
     .pipe(gulpif(debug, sourcemaps.init()))
       .pipe(gulpif(!debug, uglify()))
     .pipe(gulpif(debug, sourcemaps.write()))
+    .pipe(rename("BitMonster.min.js"))
     .pipe(gulp.dest('./dist/'));
-})
+});
 
 
 gulp.task('sass', function () {

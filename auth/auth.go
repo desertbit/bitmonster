@@ -37,8 +37,8 @@ import (
 const (
 	authSocketValueKey = "auth"
 
-	checkAuthInterval = time.Minute
-	reauthTimeout     = 15 * time.Second
+	checkAuthInterval = 2 * time.Minute
+	reauthTimeout     = 45 * time.Second
 )
 
 //#################//

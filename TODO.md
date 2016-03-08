@@ -1,4 +1,7 @@
+- socket.go: OnNewSocketFunc is used also for close hooks.
 - auth.js: merge the auth token and the auth data into a single encrypted string which is saved together in the local storage. Remove it and invalidate it if something failed.
+- Increase BitMonster function call timeout.
+- if the method does not exists, trigger the error callback immediatelly.
 - Add a cache and hot cache.
 - Events are bound twice due to the connected_and_auth internal event?
 - Implement HTTPS2

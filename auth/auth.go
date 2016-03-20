@@ -38,7 +38,7 @@ const (
 	authSocketValueKey = "auth"
 
 	checkAuthInterval = 2 * time.Minute
-	reauthTimeout     = 45 * time.Second
+	reauthTimeout     = 30 * time.Second
 )
 
 //#################//

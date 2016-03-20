@@ -16,7 +16,7 @@
     "tests"
   ],
   "dependencies": {
-    "glue-socket": "~1.8.0",
+    "glue-socket": "~1.8.1",
     "jquery": "~2.1.4",
     "sjcl": "~1.0.3"
   }

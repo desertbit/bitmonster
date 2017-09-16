@@ -4,4 +4,4 @@
 
 BitMonster is a powerful platform for your real-time mobile or web application.
 
-**This project is still under heavy development.**
+**This project is deprecated. Use [PROTON](https://github.com/desertbit/proton).**
